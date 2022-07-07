@@ -1,0 +1,16 @@
+notes.txt
+notes.md
+
+del/
+delete/
+tmp/
+
+.idea/
+.vscode/
+.vs/
+
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
