@@ -3,6 +3,11 @@
 internal enum OpCode : byte
 {
     OpConstant,
+    OpAdd,
+    OpSubtract,
+    OpMultiply,
+    OpDivide,
+    OpNegate,
     OpReturn
 }
 
@@ -12,19 +17,20 @@ public class Chunk
     private readonly ValueArray _constants = new();
     private readonly List<int> _lines = new();
 
-    public void WriteChunk(byte @byte, int line)
+    internal void WriteChunk(byte @byte, int line)
     {
         _code.Add(@byte);
         _lines.Add(line);
     }
 
-    public void DisassembleChunk(string name)
+    internal void DisassembleChunk(string name)
     {
         Console.WriteLine($"== {name} ==");
-        for (var offset = 0; offset < _code.Count;) offset = DisassembleInstruction(offset);
+        var offset = 0;
+        while (offset < _code.Count) offset = DisassembleInstruction(offset);
     }
 
-    private int DisassembleInstruction(int offset)
+    internal int DisassembleInstruction(int offset)
     {
         Console.Write($"{offset:0000} ");
 
@@ -36,12 +42,22 @@ public class Chunk
         var instruction = _code[offset];
         switch ((OpCode)instruction)
         {
-            case OpCode.OpReturn:
-                return SimpleInstruction("OP_RETURN", offset);
             case OpCode.OpConstant:
                 return ConstantInstruction("OP_CONSTANT", offset);
+            case OpCode.OpAdd:
+                return SimpleInstruction("OP_ADD", offset);
+            case OpCode.OpSubtract:
+                return SimpleInstruction("OP_SUBTRACT", offset);
+            case OpCode.OpMultiply:
+                return SimpleInstruction("OP_MULTIPLY", offset);
+            case OpCode.OpDivide:
+                return SimpleInstruction("OP_DIVIDE", offset);
+            case OpCode.OpNegate:
+                return SimpleInstruction("OP_NEGATE", offset);
+            case OpCode.OpReturn:
+                return SimpleInstruction("OP_RETURN", offset);
             default:
-                Console.WriteLine($"Unknown opcode {instruction}");
+                Console.Error.WriteLine($"Unknown opcode {instruction}.");
                 return offset + 1;
         }
     }
@@ -56,14 +72,24 @@ public class Chunk
     {
         var constant = _code[offset + 1];
         Console.Write($"{name,-16} {constant,4} '");
-        _constants.PrintValue(constant);
+        _constants.PrintValueWithIdx(constant);
         Console.WriteLine("'");
         return offset + 2;
     }
 
-    public int AddConstant(double value)
+    internal int AddConstant(double value)
     {
         _constants.WriteValueArray(value);
         return _constants.Count - 1;
+    }
+
+    internal byte ReadByte(int idx)
+    {
+        return _code[idx];
+    }
+
+    internal double ReadConstant(int idx)
+    {
+        return _constants.ReadConstant(idx);
     }
 }
