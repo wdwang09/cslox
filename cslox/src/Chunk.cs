@@ -2,13 +2,13 @@
 
 internal enum OpCode : byte
 {
-    OpConstant,
-    OpAdd,
-    OpSubtract,
-    OpMultiply,
-    OpDivide,
-    OpNegate,
-    OpReturn
+    Constant,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Negate,
+    Return
 }
 
 public class Chunk
@@ -42,19 +42,19 @@ public class Chunk
         var instruction = _code[offset];
         switch ((OpCode)instruction)
         {
-            case OpCode.OpConstant:
+            case OpCode.Constant:
                 return ConstantInstruction("OP_CONSTANT", offset);
-            case OpCode.OpAdd:
+            case OpCode.Add:
                 return SimpleInstruction("OP_ADD", offset);
-            case OpCode.OpSubtract:
+            case OpCode.Subtract:
                 return SimpleInstruction("OP_SUBTRACT", offset);
-            case OpCode.OpMultiply:
+            case OpCode.Multiply:
                 return SimpleInstruction("OP_MULTIPLY", offset);
-            case OpCode.OpDivide:
+            case OpCode.Divide:
                 return SimpleInstruction("OP_DIVIDE", offset);
-            case OpCode.OpNegate:
+            case OpCode.Negate:
                 return SimpleInstruction("OP_NEGATE", offset);
-            case OpCode.OpReturn:
+            case OpCode.Return:
                 return SimpleInstruction("OP_RETURN", offset);
             default:
                 Console.Error.WriteLine($"Unknown opcode {instruction}.");

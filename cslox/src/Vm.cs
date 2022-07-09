@@ -2,16 +2,16 @@
 
 public enum InterpretResult
 {
-    InterpretOk,
-    InterpretCompileError,
-    InterpretRuntimeError
+    Ok,
+    CompileError,
+    RuntimeError
 }
 
 public class Vm
 {
     private const int StackMax = 256;
     private readonly double[] _stack = new double[StackMax];
-    private Chunk _chunk = new();
+    private Chunk? _chunk;
     private int _ip;
     private int _stackTop;
 
@@ -36,45 +36,45 @@ public class Vm
             }
 
             Console.WriteLine();
-            _chunk.DisassembleInstruction(_ip);
+            _chunk!.DisassembleInstruction(_ip);
 #endif
             var instruction = ReadByte();
             switch ((OpCode)instruction)
             {
-                case OpCode.OpConstant:
+                case OpCode.Constant:
                     var constant = ReadConstant();
                     Push(constant);
                     ValueArray.PrintValue(constant);
                     Console.WriteLine();
                     break;
-                case OpCode.OpAdd:
-                case OpCode.OpSubtract:
-                case OpCode.OpMultiply:
-                case OpCode.OpDivide:
+                case OpCode.Add:
+                case OpCode.Subtract:
+                case OpCode.Multiply:
+                case OpCode.Divide:
                     BinaryOp((OpCode)instruction);
                     break;
-                case OpCode.OpNegate:
+                case OpCode.Negate:
                     Push(-Pop());
                     break;
-                case OpCode.OpReturn:
+                case OpCode.Return:
                     ValueArray.PrintValue(Pop());
                     Console.WriteLine();
-                    return InterpretResult.InterpretOk;
+                    return InterpretResult.Ok;
                 default:
                     Console.Error.WriteLine($"Unknown opcode {instruction}.");
-                    return InterpretResult.InterpretCompileError;
+                    return InterpretResult.CompileError;
             }
         }
     }
 
     private byte ReadByte()
     {
-        return _chunk.ReadByte(_ip++);
+        return _chunk!.ReadByte(_ip++);
     }
 
     private double ReadConstant()
     {
-        return _chunk.ReadConstant(ReadByte());
+        return _chunk!.ReadConstant(ReadByte());
     }
 
     private void Push(double value)
@@ -93,16 +93,16 @@ public class Vm
         var a = Pop();
         switch (instruction)
         {
-            case OpCode.OpAdd:
+            case OpCode.Add:
                 Push(a + b);
                 break;
-            case OpCode.OpSubtract:
+            case OpCode.Subtract:
                 Push(a - b);
                 break;
-            case OpCode.OpMultiply:
+            case OpCode.Multiply:
                 Push(a * b);
                 break;
-            case OpCode.OpDivide:
+            case OpCode.Divide:
                 Push(a / b);
                 break;
             default:
