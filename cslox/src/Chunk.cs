@@ -25,9 +25,11 @@ public class Chunk
 
     internal void DisassembleChunk(string name)
     {
-        Console.WriteLine($"== {name} ==");
+        var header = $"===== {name} =====";
+        Console.WriteLine(header);
         var offset = 0;
         while (offset < _code.Count) offset = DisassembleInstruction(offset);
+        Console.WriteLine(new string('=', header.Length));
     }
 
     internal int DisassembleInstruction(int offset)
@@ -79,6 +81,7 @@ public class Chunk
 
     internal int AddConstant(double value)
     {
+        // double -> Value
         _constants.WriteValueArray(value);
         return _constants.Count - 1;
     }

@@ -67,12 +67,12 @@ internal readonly struct Token
 
 public class Scanner
 {
+    private readonly string _source;
     private int _current;
-    private int _line = 1;
-    private string _source = "";
+    private int _line;
     private int _start;
 
-    internal void Init(string source)
+    internal Scanner(string source)
     {
         _source = source;
         _start = 0;

@@ -44,8 +44,8 @@ public class Vm
                 case OpCode.Constant:
                     var constant = ReadConstant();
                     Push(constant);
-                    ValueArray.PrintValue(constant);
-                    Console.WriteLine();
+                    // ValueArray.PrintValue(constant);
+                    // Console.WriteLine();
                     break;
                 case OpCode.Add:
                 case OpCode.Subtract:

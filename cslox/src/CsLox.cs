@@ -36,6 +36,7 @@ public class CsLox
 
     private InterpretResult Interpret(string source)
     {
-        return _compiler.Compile(source);
+        if (!_compiler.Compile(source)) return InterpretResult.CompileError;
+        return _compiler.Run();
     }
 }
