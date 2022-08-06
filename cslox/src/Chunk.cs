@@ -3,10 +3,17 @@
 internal enum OpCode : byte
 {
     Constant,
+    Nil,
+    True,
+    False,
+    Equal,
+    Greater,
+    Less,
     Add,
     Subtract,
     Multiply,
     Divide,
+    Not,
     Negate,
     Return
 }
@@ -46,6 +53,18 @@ public class Chunk
         {
             case OpCode.Constant:
                 return ConstantInstruction("OP_CONSTANT", offset);
+            case OpCode.Nil:
+                return SimpleInstruction("OP_NIL", offset);
+            case OpCode.True:
+                return SimpleInstruction("OP_TRUE", offset);
+            case OpCode.False:
+                return SimpleInstruction("OP_FALSE", offset);
+            case OpCode.Equal:
+                return SimpleInstruction("OP_EQUAL", offset);
+            case OpCode.Greater:
+                return SimpleInstruction("OP_GREATER", offset);
+            case OpCode.Less:
+                return SimpleInstruction("OP_LESS", offset);
             case OpCode.Add:
                 return SimpleInstruction("OP_ADD", offset);
             case OpCode.Subtract:
@@ -54,6 +73,8 @@ public class Chunk
                 return SimpleInstruction("OP_MULTIPLY", offset);
             case OpCode.Divide:
                 return SimpleInstruction("OP_DIVIDE", offset);
+            case OpCode.Not:
+                return SimpleInstruction("OP_NOT", offset);
             case OpCode.Negate:
                 return SimpleInstruction("OP_NEGATE", offset);
             case OpCode.Return:
@@ -79,9 +100,8 @@ public class Chunk
         return offset + 2;
     }
 
-    internal int AddConstant(double value)
+    internal int AddConstant(Value value)
     {
-        // double -> Value
         _constants.WriteValueArray(value);
         return _constants.Count - 1;
     }
@@ -91,8 +111,13 @@ public class Chunk
         return _code[idx];
     }
 
-    internal double ReadConstant(int idx)
+    internal Value ReadConstant(int idx)
     {
         return _constants.ReadConstant(idx);
+    }
+
+    internal int GetLineNumber(int offset)
+    {
+        return _lines[offset];
     }
 }
