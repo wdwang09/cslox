@@ -4,7 +4,8 @@ internal enum ValueType : byte
 {
     Bool,
     Nil,
-    Number
+    Number,
+    Obj
 }
 
 internal readonly struct Value
@@ -31,6 +32,14 @@ internal readonly struct Value
         Number = value;
     }
 
+    public Value(Obj obj)
+    {
+        _type = ValueType.Obj;
+        Boolean = false;
+        Number = 0;
+        _obj = obj;
+    }
+
     internal bool IsBool()
     {
         return _type == ValueType.Bool;
@@ -46,6 +55,16 @@ internal readonly struct Value
         return _type == ValueType.Number;
     }
 
+    internal bool IsObj()
+    {
+        return _type == ValueType.Obj;
+    }
+
+    internal bool IsObjType(ObjType objType)
+    {
+        return IsObj() && Obj.Type == objType;
+    }
+
     internal bool IsFalsey()
     {
         return IsNil() || (IsBool() && !Boolean);
@@ -59,6 +78,7 @@ internal readonly struct Value
             ValueType.Bool => Boolean == b.Boolean,
             ValueType.Nil => true,
             ValueType.Number => Math.Abs(Number - b.Number) < 1e-9,
+            ValueType.Obj => Obj.IsEqual(b.Obj),
             _ => false
         };
     }
@@ -66,6 +86,17 @@ internal readonly struct Value
     private readonly ValueType _type;
     internal bool Boolean { get; }
     internal double Number { get; }
+
+    private readonly Obj? _obj = null;
+
+    internal Obj Obj
+    {
+        get
+        {
+            if (IsObj()) return _obj!;
+            throw new Exception("\"obj\" is null.");
+        }
+    }
 }
 
 public class ValueArray
@@ -89,7 +120,20 @@ public class ValueArray
             Console.Write(value.Boolean ? "true" : "false");
         else if (value.IsNil())
             Console.Write("nil");
-        else if (value.IsNumber()) Console.Write(value.Number);
+        else if (value.IsNumber())
+            Console.Write(value.Number);
+        else if (value.IsObj())
+        {
+            switch (value.Obj.Type)
+            {
+                case ObjType.String:
+                    Console.Write(((ObjString)value.Obj).AsCSharpStringToPrint());
+                    break;
+                default:
+                    Console.Error.Write("Unsupported.");
+                    break;
+            }
+        }
     }
 
     internal Value ReadConstant(int idx)

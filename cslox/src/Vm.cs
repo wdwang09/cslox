@@ -123,6 +123,18 @@ public class Vm
 
     private InterpretResult BinaryOp(OpCode instruction)
     {
+        if (instruction == OpCode.Add &&
+            Peek(0).IsObj() &&
+            Peek(1).IsObj() &&
+            Peek(0).Obj is ObjString bObjString &&
+            Peek(1).Obj is ObjString aObjString)
+        {
+            Pop();
+            Pop();
+            Push(new Value(ObjString.Concatenate(aObjString, bObjString)));
+            return InterpretResult.Ok;
+        }
+
         if (!Peek(0).IsNumber() || !Peek(1).IsNumber())
         {
             RuntimeError("Operands must be numbers.");
@@ -159,11 +171,10 @@ public class Vm
         return InterpretResult.Ok;
     }
 
-    private void RuntimeError(params string[] msgs)
+    private void RuntimeError(params string[] messages)
     {
-        foreach (var msg in msgs) Console.Error.Write(msg);
+        foreach (var msg in messages) Console.Error.Write(msg);
         Console.Error.WriteLine();
-
         var line = _chunk!.GetLineNumber(_ip);
         Console.Error.WriteLine($"[line {line}] in script.");
         ResetStack();

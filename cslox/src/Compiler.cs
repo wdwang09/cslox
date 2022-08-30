@@ -32,7 +32,7 @@ public class Compiler
             [TokenType.Less] = new(null, Binary, Precedence.Comparison),
             [TokenType.LessEqual] = new(null, Binary, Precedence.Comparison),
             [TokenType.Identifier] = new(null, null, Precedence.None),
-            [TokenType.String] = new(null, null, Precedence.None),
+            [TokenType.String] = new(String, null, Precedence.None),
             [TokenType.Number] = new(Number, null, Precedence.None),
             [TokenType.And] = new(null, null, Precedence.None),
             [TokenType.Class] = new(null, null, Precedence.None),
@@ -260,5 +260,12 @@ public class Compiler
             default:
                 return;
         }
+    }
+
+    private void String()
+    {
+        var str = _parser!.Previous!.Value.Lexeme;
+        var obj = new ObjString(str.Substring(1, str.Length - 2));
+        EmitConstant(new Value(obj));
     }
 }
