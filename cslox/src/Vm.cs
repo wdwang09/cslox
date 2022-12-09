@@ -14,6 +14,7 @@ public class Vm
     private Chunk? _chunk;
     private int _ip;
     private int _stackTop;
+    private readonly Dictionary<string, Value> _globals = new();
 
     public InterpretResult Interpret(Chunk chunk)
     {
@@ -36,7 +37,8 @@ public class Vm
             for (var i = 0; i < _stackTop; i++)
             {
                 Console.Write("[");
-                ValueArray.PrintValue(_stack[i]);
+                _stack[i].Print();
+                // ValueArray.PrintValue(_stack[i]);
                 Console.Write("]");
             }
 
@@ -58,6 +60,34 @@ public class Vm
                     break;
                 case OpCode.False:
                     Push(new Value(false));
+                    break;
+                case OpCode.Pop:
+                    Pop();
+                    break;
+                case OpCode.GetGlobal:
+                    var nameGetGlobal = ReadString();
+                    if (!_globals.ContainsKey(nameGetGlobal))
+                    {
+                        RuntimeError("Undefined variable '", nameGetGlobal, "'.");
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    Push(_globals[nameGetGlobal]);
+                    break;
+                case OpCode.DefineGlobal:
+                    var nameDefineGlobal = ReadString();
+                    _globals[nameDefineGlobal] = Peek(0);
+                    Pop();
+                    break;
+                case OpCode.SetGlobal:
+                    var nameSetGlobal = ReadString();
+                    if (!_globals.ContainsKey(nameSetGlobal))
+                    {
+                        RuntimeError("Undefined variable '", nameSetGlobal, "'.");
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    _globals[nameSetGlobal] = Peek(0);
                     break;
                 case OpCode.Equal:
                     var b = Pop();
@@ -85,9 +115,11 @@ public class Vm
 
                     Push(new Value(-Pop().Number));
                     break;
-                case OpCode.Return:
-                    ValueArray.PrintValue(Pop());
+                case OpCode.Print:
+                    Pop().Print();
                     Console.WriteLine();
+                    break;
+                case OpCode.Return:
                     return InterpretResult.Ok;
                 default:
                     Console.Error.WriteLine($"Unknown opcode {instruction}.");
@@ -109,6 +141,11 @@ public class Vm
     private Value ReadConstant()
     {
         return _chunk!.ReadConstant(ReadByte());
+    }
+
+    private string ReadString()
+    {
+        return ReadConstant().String;
     }
 
     private void Push(Value value)

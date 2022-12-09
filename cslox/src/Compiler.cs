@@ -31,7 +31,7 @@ public class Compiler
             [TokenType.GreaterEqual] = new(null, Binary, Precedence.Comparison),
             [TokenType.Less] = new(null, Binary, Precedence.Comparison),
             [TokenType.LessEqual] = new(null, Binary, Precedence.Comparison),
-            [TokenType.Identifier] = new(null, null, Precedence.None),
+            [TokenType.Identifier] = new(Variable, null, Precedence.None),
             [TokenType.String] = new(String, null, Precedence.None),
             [TokenType.Number] = new(Number, null, Precedence.None),
             [TokenType.And] = new(null, null, Precedence.None),
@@ -61,10 +61,89 @@ public class Compiler
         _chunk = new Chunk();
         _parser = new Parser();
         Advance();
-        Expression();
-        Consume(TokenType.Eof, "Expect end of expression.");
+        while (!Match(TokenType.Eof))
+        {
+            Declaration();
+        }
+
         EndCompiler();
         return !_parser.HadError;
+    }
+
+    private bool Match(TokenType type)
+    {
+        if (!Check(type)) return false;
+        Advance();
+        return true;
+    }
+
+    private bool Check(TokenType type)
+    {
+        return _parser!.Current!.Value.Type == type;
+    }
+
+    // declaration    → varDecl
+    //                | statement ;
+    private void Declaration()
+    {
+        if (Match(TokenType.Var))
+        {
+            VarDeclaration();
+        }
+        else
+        {
+            Statement();
+        }
+
+        if (_parser!.PanicMode)
+        {
+            Synchronize();
+        }
+    }
+
+    private void VarDeclaration()
+    {
+        var global = ParseVariable("Expect variable name.");
+
+        if (Match(TokenType.Equal))
+        {
+            Expression();
+        }
+        else
+        {
+            EmitByte(OpCode.Nil);
+        }
+
+        Consume(TokenType.Semicolon, "Expect ';' after variable declaration.");
+        DefineVariable(global);
+    }
+
+    // statement      → exprStmt
+    //                | printStmt ;
+    private void Statement()
+    {
+        if (Match(TokenType.Print))
+        {
+            PrintStatement();
+        }
+        else
+        {
+            ExpressionStatement();
+        }
+    }
+
+    private void PrintStatement()
+    {
+        Expression();
+        Consume(TokenType.Semicolon, "Expect ';' after value.");
+        EmitByte(OpCode.Print);
+    }
+
+    private void ExpressionStatement()
+    {
+        Expression();
+        Consume(TokenType.Semicolon, "Expect ';' after expression.");
+        EmitByte(OpCode.Pop);
     }
 
     internal InterpretResult Run()
@@ -100,14 +179,36 @@ public class Compiler
             return;
         }
 
-        prefixRule();
+        var canAssign = (precedence <= Precedence.Assignment);
+        prefixRule(canAssign);
 
         while (precedence <= _rules[_parser!.Current!.Value.Type].Precedence)
         {
             Advance();
             var infixRule = _rules[_parser!.Previous!.Value.Type].Infix;
-            infixRule!();
+            infixRule!(canAssign);
         }
+
+        if (canAssign && Match(TokenType.Equal))
+        {
+            _parser.Error("Invalid assignment target.");
+        }
+    }
+
+    private byte ParseVariable(string errorMessage)
+    {
+        Consume(TokenType.Identifier, errorMessage);
+        return IdentifierConstant(_parser!.Previous!.Value);
+    }
+
+    private void DefineVariable(byte global)
+    {
+        EmitBytes(OpCode.DefineGlobal, global);
+    }
+
+    private byte IdentifierConstant(Token name)
+    {
+        return MakeConstant(new Value(name.Lexeme));
     }
 
     private void Consume(TokenType type, string message)
@@ -156,12 +257,6 @@ public class Compiler
         EmitByte(OpCode.Return);
     }
 
-    private void Number()
-    {
-        var value = double.Parse(_parser!.Previous!.Value.Lexeme);
-        EmitConstant(new Value(value));
-    }
-
     private void EmitConstant(Value value)
     {
         EmitBytes(OpCode.Constant, MakeConstant(value));
@@ -179,13 +274,19 @@ public class Compiler
         return (byte)constant;
     }
 
-    private void Grouping()
+    private void Number(bool canAssign)
+    {
+        var value = double.Parse(_parser!.Previous!.Value.Lexeme);
+        EmitConstant(new Value(value));
+    }
+
+    private void Grouping(bool canAssign)
     {
         Expression();
         Consume(TokenType.RightParen, "Expect ')' after expression.");
     }
 
-    private void Unary()
+    private void Unary(bool canAssign)
     {
         var operatorType = _parser!.Previous!.Value.Type;
         ParsePrecedence(Precedence.Unary);
@@ -202,7 +303,7 @@ public class Compiler
         }
     }
 
-    private void Binary()
+    private void Binary(bool canAssign)
     {
         var operatorType = _parser!.Previous!.Value.Type;
         var rule = _rules[operatorType];
@@ -244,7 +345,7 @@ public class Compiler
         }
     }
 
-    private void Literal()
+    private void Literal(bool canAssign)
     {
         switch (_parser!.Previous!.Value.Type)
         {
@@ -262,9 +363,51 @@ public class Compiler
         }
     }
 
-    private void String()
+    private void String(bool canAssign)
     {
         var str = _parser!.Previous!.Value.Lexeme;
         EmitConstant(new Value(str.Substring(1, str.Length - 2)));
+    }
+
+    private void Variable(bool canAssign)
+    {
+        NamedVariable(_parser!.Previous!.Value, canAssign);
+    }
+
+    private void NamedVariable(Token name, bool canAssign)
+    {
+        var arg = IdentifierConstant(name);
+        if (canAssign && Match(TokenType.Equal))
+        {
+            Expression();
+            EmitBytes(OpCode.SetGlobal, arg);
+        }
+        else
+        {
+            EmitBytes(OpCode.GetGlobal, arg);
+        }
+    }
+
+    private void Synchronize()
+    {
+        _parser!.PanicMode = false;
+        while (_parser!.Current!.Value.Type != TokenType.Eof)
+        {
+            if (_parser!.Previous!.Value.Type == TokenType.Semicolon) return;
+            switch (_parser!.Current!.Value.Type)
+            {
+                case TokenType.Class:
+                case TokenType.Fun:
+                case TokenType.Var:
+                case TokenType.For:
+                case TokenType.If:
+                case TokenType.While:
+                case TokenType.Print:
+                case TokenType.Return:
+                    return;
+            }
+
+            Advance();
+        }
     }
 }

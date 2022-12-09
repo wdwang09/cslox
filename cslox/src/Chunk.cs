@@ -6,6 +6,10 @@ internal enum OpCode : byte
     Nil,
     True,
     False,
+    Pop,
+    GetGlobal,
+    DefineGlobal,
+    SetGlobal,
     Equal,
     Greater,
     Less,
@@ -15,6 +19,7 @@ internal enum OpCode : byte
     Divide,
     Not,
     Negate,
+    Print,
     Return
 }
 
@@ -59,6 +64,14 @@ public class Chunk
                 return SimpleInstruction("OP_TRUE", offset);
             case OpCode.False:
                 return SimpleInstruction("OP_FALSE", offset);
+            case OpCode.Pop:
+                return SimpleInstruction("OP_POP", offset);
+            case OpCode.GetGlobal:
+                return ConstantInstruction("OP_GET_GLOBAL", offset);
+            case OpCode.DefineGlobal:
+                return ConstantInstruction("OP_DEFINE_GLOBAL", offset);
+            case OpCode.SetGlobal:
+                return ConstantInstruction("OP_SET_GLOBAL", offset);
             case OpCode.Equal:
                 return SimpleInstruction("OP_EQUAL", offset);
             case OpCode.Greater:
@@ -77,6 +90,8 @@ public class Chunk
                 return SimpleInstruction("OP_NOT", offset);
             case OpCode.Negate:
                 return SimpleInstruction("OP_NEGATE", offset);
+            case OpCode.Print:
+                return SimpleInstruction("OP_PRINT", offset);
             case OpCode.Return:
                 return SimpleInstruction("OP_RETURN", offset);
             default:
@@ -94,9 +109,9 @@ public class Chunk
     private int ConstantInstruction(string name, int offset)
     {
         var constant = _code[offset + 1];
-        Console.Write($"{name,-16} {constant,4} '");
+        Console.Write($"{name,-16} {constant,4} {{");
         _constants.PrintValueWithIdx(constant);
-        Console.WriteLine("'");
+        Console.WriteLine("}");
         return offset + 2;
     }
 

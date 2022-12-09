@@ -92,6 +92,22 @@ internal readonly struct Value
         };
     }
 
+    internal void Print()
+    {
+        if (IsBool())
+            Console.Write(Boolean ? "true" : "false");
+        else if (IsNil())
+            Console.Write("nil");
+        else if (IsNumber())
+            Console.Write(Number);
+        else if (IsString())
+            Console.Write("\"" + String + "\"");
+        else
+        {
+            Console.Error.Write("[Unsupported]");
+        }
+    }
+
     private readonly ValueType _type;
     internal bool Boolean { get; } = false;
     internal double Number { get; } = 0;
@@ -122,23 +138,7 @@ public class ValueArray
 
     internal void PrintValueWithIdx(int idx)
     {
-        PrintValue(_values[idx]);
-    }
-
-    internal static void PrintValue(Value value)
-    {
-        if (value.IsBool())
-            Console.Write(value.Boolean ? "true" : "false");
-        else if (value.IsNil())
-            Console.Write("nil");
-        else if (value.IsNumber())
-            Console.Write(value.Number);
-        else if (value.IsString())
-            Console.Write("\"" + value.String + "\"");
-        else
-        {
-            Console.Error.Write("[Unsupported]");
-        }
+        _values[idx].Print();
     }
 
     internal Value ReadConstant(int idx)

@@ -15,7 +15,7 @@ internal enum Precedence
     Primary
 }
 
-internal delegate void ParseFn();
+internal delegate void ParseFn(bool canAssign);
 
 internal readonly struct ParseRule
 {
@@ -33,7 +33,7 @@ internal readonly struct ParseRule
 
 public class Parser
 {
-    private bool _panicMode;
+    internal bool PanicMode;
     internal Token? Current;
     internal bool HadError;
     internal Token? Previous;
@@ -43,7 +43,7 @@ public class Parser
         Current = null;
         Previous = null;
         HadError = false;
-        _panicMode = false;
+        PanicMode = false;
     }
 
     internal void ErrorAtCurrent(string message)
@@ -60,8 +60,8 @@ public class Parser
 
     private void ErrorAt(Token token, string message)
     {
-        if (_panicMode) return;
-        _panicMode = true;
+        if (PanicMode) return;
+        PanicMode = true;
         Console.Error.Write($"[Line {token.Line}]");
         if (token.Type == TokenType.Eof)
         {
