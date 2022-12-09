@@ -5,7 +5,8 @@ internal enum ValueType : byte
     Bool,
     Nil,
     Number,
-    Obj
+    Obj,
+    String
 }
 
 internal readonly struct Value
@@ -14,29 +15,30 @@ internal readonly struct Value
     public Value()
     {
         _type = ValueType.Nil;
-        Boolean = false;
-        Number = 0;
     }
 
     public Value(bool value)
     {
         _type = ValueType.Bool;
         Boolean = value;
-        Number = 0;
     }
 
     public Value(double value)
     {
         _type = ValueType.Number;
-        Boolean = false;
         Number = value;
     }
 
+    public Value(string value)
+    {
+        _type = ValueType.String;
+        String = value;
+    }
+
+    [Obsolete]
     public Value(Obj obj)
     {
         _type = ValueType.Obj;
-        Boolean = false;
-        Number = 0;
         _obj = obj;
     }
 
@@ -55,11 +57,18 @@ internal readonly struct Value
         return _type == ValueType.Number;
     }
 
+    internal bool IsString()
+    {
+        return _type == ValueType.String;
+    }
+
+    [Obsolete]
     internal bool IsObj()
     {
         return _type == ValueType.Obj;
     }
 
+    [Obsolete]
     internal bool IsObjType(ObjType objType)
     {
         return IsObj() && Obj.Type == objType;
@@ -78,17 +87,19 @@ internal readonly struct Value
             ValueType.Bool => Boolean == b.Boolean,
             ValueType.Nil => true,
             ValueType.Number => Math.Abs(Number - b.Number) < 1e-9,
-            ValueType.Obj => Obj.IsEqual(b.Obj),
+            ValueType.String => String == b.String,
             _ => false
         };
     }
 
     private readonly ValueType _type;
-    internal bool Boolean { get; }
-    internal double Number { get; }
+    internal bool Boolean { get; } = false;
+    internal double Number { get; } = 0;
+    internal string String { get; } = "";
 
-    private readonly Obj? _obj = null;
+    [Obsolete] private readonly Obj? _obj = null;
 
+    [Obsolete]
     internal Obj Obj
     {
         get
@@ -122,17 +133,11 @@ public class ValueArray
             Console.Write("nil");
         else if (value.IsNumber())
             Console.Write(value.Number);
-        else if (value.IsObj())
+        else if (value.IsString())
+            Console.Write("\"" + value.String + "\"");
+        else
         {
-            switch (value.Obj.Type)
-            {
-                case ObjType.String:
-                    Console.Write(((ObjString)value.Obj).AsCSharpStringToPrint());
-                    break;
-                default:
-                    Console.Error.Write("Unsupported.");
-                    break;
-            }
+            Console.Error.Write("[Unsupported]");
         }
     }
 

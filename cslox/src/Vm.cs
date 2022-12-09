@@ -123,15 +123,11 @@ public class Vm
 
     private InterpretResult BinaryOp(OpCode instruction)
     {
-        if (instruction == OpCode.Add &&
-            Peek(0).IsObj() &&
-            Peek(1).IsObj() &&
-            Peek(0).Obj is ObjString bObjString &&
-            Peek(1).Obj is ObjString aObjString)
+        if (instruction == OpCode.Add && Peek(0).IsString() && Peek(1).IsString())
         {
-            Pop();
-            Pop();
-            Push(new Value(ObjString.Concatenate(aObjString, bObjString)));
+            var bString = Pop().String;
+            var aString = Pop().String;
+            Push(new Value(aString + bString));
             return InterpretResult.Ok;
         }
 

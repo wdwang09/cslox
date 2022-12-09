@@ -265,7 +265,6 @@ public class Compiler
     private void String()
     {
         var str = _parser!.Previous!.Value.Lexeme;
-        var obj = new ObjString(str.Substring(1, str.Length - 2));
-        EmitConstant(new Value(obj));
+        EmitConstant(new Value(str.Substring(1, str.Length - 2)));
     }
 }
