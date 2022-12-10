@@ -7,6 +7,8 @@ internal enum OpCode : byte
     True,
     False,
     Pop,
+    GetLocal,
+    SetLocal,
     GetGlobal,
     DefineGlobal,
     SetGlobal,
@@ -66,6 +68,10 @@ public class Chunk
                 return SimpleInstruction("OP_FALSE", offset);
             case OpCode.Pop:
                 return SimpleInstruction("OP_POP", offset);
+            case OpCode.GetLocal:
+                return ByteInstruction("OP_GET_LOCAL", offset);
+            case OpCode.SetLocal:
+                return ByteInstruction("OP_SET_LOCAL", offset);
             case OpCode.GetGlobal:
                 return ConstantInstruction("OP_GET_GLOBAL", offset);
             case OpCode.DefineGlobal:
@@ -112,6 +118,13 @@ public class Chunk
         Console.Write($"{name,-16} {constant,4} {{");
         _constants.PrintValueWithIdx(constant);
         Console.WriteLine("}");
+        return offset + 2;
+    }
+
+    private int ByteInstruction(string name, int offset)
+    {
+        var slot = _code[offset + 1];
+        Console.WriteLine($"{name,-16} {slot,4}");
         return offset + 2;
     }
 

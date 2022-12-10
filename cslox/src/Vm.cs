@@ -64,6 +64,14 @@ public class Vm
                 case OpCode.Pop:
                     Pop();
                     break;
+                case OpCode.GetLocal:
+                    var slotGetLocal = ReadByte();
+                    Push(_stack[slotGetLocal]);
+                    break;
+                case OpCode.SetLocal:
+                    var slotSetLocal = ReadByte();
+                    _stack[slotSetLocal] = Peek(0);
+                    break;
                 case OpCode.GetGlobal:
                     var nameGetGlobal = ReadString();
                     if (!_globals.ContainsKey(nameGetGlobal))

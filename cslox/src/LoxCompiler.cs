@@ -1,14 +1,29 @@
 ﻿namespace cslox;
 
-public class Compiler
+internal struct Local
+{
+    internal string Name;
+    internal int Depth;
+}
+
+internal class SubCompiler
+{
+    public const int LocalMax = 256;
+    public readonly Local[] Locals = new Local[LocalMax];
+    public int LocalCount = 0;
+    public int ScopeDepth = 0;
+}
+
+public class LoxCompiler
 {
     private readonly Dictionary<TokenType, ParseRule> _rules;
     private readonly Vm _vm = new();
     private Chunk? _chunk;
-    private Parser? _parser;
     private Scanner? _scanner;
+    private Parser? _parser;
+    private readonly SubCompiler _current = new();
 
-    public Compiler()
+    public LoxCompiler()
     {
         _rules = new Dictionary<TokenType, ParseRule>
         {
@@ -119,12 +134,21 @@ public class Compiler
     }
 
     // statement      → exprStmt
-    //                | printStmt ;
+    //                | printStmt
+    //                | block ;
+    //
+    // block          → "{" declaration* "}" ;
     private void Statement()
     {
         if (Match(TokenType.Print))
         {
             PrintStatement();
+        }
+        else if (Match(TokenType.LeftBrace))
+        {
+            BeginScope();
+            Block();
+            EndScope();
         }
         else
         {
@@ -137,6 +161,32 @@ public class Compiler
         Expression();
         Consume(TokenType.Semicolon, "Expect ';' after value.");
         EmitByte(OpCode.Print);
+    }
+
+    private void BeginScope()
+    {
+        _current.ScopeDepth++;
+    }
+
+    private void EndScope()
+    {
+        _current.ScopeDepth--;
+        while (_current.LocalCount > 0 &&
+               _current.Locals[_current.LocalCount - 1].Depth > _current.ScopeDepth)
+        {
+            EmitByte(OpCode.Pop);
+            _current.LocalCount--;
+        }
+    }
+
+    private void Block()
+    {
+        while (!Check(TokenType.RightBrace) && !Check(TokenType.Eof))
+        {
+            Declaration();
+        }
+
+        Consume(TokenType.RightBrace, "Expect '}' after block.");
     }
 
     private void ExpressionStatement()
@@ -198,12 +248,78 @@ public class Compiler
     private byte ParseVariable(string errorMessage)
     {
         Consume(TokenType.Identifier, errorMessage);
+
+        DeclareVariable();
+        if (_current.ScopeDepth > 0) return 0;
+
         return IdentifierConstant(_parser!.Previous!.Value);
+    }
+
+    private void DeclareVariable()
+    {
+        if (_current.ScopeDepth == 0) return;
+        var name = _parser!.Previous!.Value.Lexeme;
+        for (var i = _current.LocalCount - 1; i >= 0; i--)
+        {
+            ref var local = ref _current.Locals[i];
+            if (local.Depth != -1 && local.Depth < _current.ScopeDepth)
+            {
+                break;
+            }
+
+            if (name == local.Name)
+            {
+                _parser!.Error("Already a variable with this name in this scope.");
+            }
+        }
+
+        AddLocal(name);
+    }
+
+    private void AddLocal(string name)
+    {
+        if (_current.LocalCount == SubCompiler.LocalMax)
+        {
+            _parser!.Error("Too many local variables in function.");
+            return;
+        }
+
+        ref var local = ref _current.Locals[_current.LocalCount++];
+        local.Name = name;
+        local.Depth = -1;
     }
 
     private void DefineVariable(byte global)
     {
+        if (_current.ScopeDepth > 0)
+        {
+            MarkInitialized();
+            return;
+        }
+
         EmitBytes(OpCode.DefineGlobal, global);
+    }
+
+    private void MarkInitialized()
+    {
+        _current.Locals[_current.LocalCount - 1].Depth = _current.ScopeDepth;
+    }
+
+    internal int ResolveLocal(SubCompiler compiler, string name)
+    {
+        for (var i = compiler.LocalCount - 1; i >= 0; i--)
+        {
+            ref var local = ref compiler.Locals[i];
+            if (name != local.Name) continue;
+            if (local.Depth == -1)
+            {
+                _parser!.Error("Can't read local variable in its own initializer.");
+            }
+
+            return i;
+        }
+
+        return -1;
     }
 
     private byte IdentifierConstant(Token name)
@@ -376,15 +492,30 @@ public class Compiler
 
     private void NamedVariable(Token name, bool canAssign)
     {
-        var arg = IdentifierConstant(name);
-        if (canAssign && Match(TokenType.Equal))
+        OpCode getOp, setOp;
+        var argResolveLocal = ResolveLocal(_current, name.Lexeme);
+        byte arg;
+        if (argResolveLocal != -1)
         {
-            Expression();
-            EmitBytes(OpCode.SetGlobal, arg);
+            getOp = OpCode.GetLocal;
+            setOp = OpCode.SetLocal;
+            arg = (byte)argResolveLocal;
         }
         else
         {
-            EmitBytes(OpCode.GetGlobal, arg);
+            arg = IdentifierConstant(name);
+            getOp = OpCode.GetGlobal;
+            setOp = OpCode.SetGlobal;
+        }
+
+        if (canAssign && Match(TokenType.Equal))
+        {
+            Expression();
+            EmitBytes(setOp, arg);
+        }
+        else
+        {
+            EmitBytes(getOp, arg);
         }
     }
 

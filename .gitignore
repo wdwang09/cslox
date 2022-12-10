@@ -1,6 +1,9 @@
+testdata
 notes.txt
 notes.md
 *.DotSettings.user
+
+*.zip
 
 del/
 delete/
