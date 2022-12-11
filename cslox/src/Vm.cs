@@ -65,38 +65,48 @@ public class Vm
                     Pop();
                     break;
                 case OpCode.GetLocal:
-                    var slotGetLocal = ReadByte();
-                    Push(_stack[slotGetLocal]);
+                {
+                    var slot = ReadByte();
+                    Push(_stack[slot]);
                     break;
+                }
                 case OpCode.SetLocal:
-                    var slotSetLocal = ReadByte();
-                    _stack[slotSetLocal] = Peek(0);
+                {
+                    var slot = ReadByte();
+                    _stack[slot] = Peek(0);
                     break;
+                }
                 case OpCode.GetGlobal:
-                    var nameGetGlobal = ReadString();
-                    if (!_globals.ContainsKey(nameGetGlobal))
+                {
+                    var name = ReadString();
+                    if (!_globals.ContainsKey(name))
                     {
-                        RuntimeError("Undefined variable '", nameGetGlobal, "'.");
+                        RuntimeError("Undefined variable '", name, "'.");
                         return InterpretResult.RuntimeError;
                     }
 
-                    Push(_globals[nameGetGlobal]);
+                    Push(_globals[name]);
                     break;
+                }
                 case OpCode.DefineGlobal:
-                    var nameDefineGlobal = ReadString();
-                    _globals[nameDefineGlobal] = Peek(0);
+                {
+                    var name = ReadString();
+                    _globals[name] = Peek(0);
                     Pop();
                     break;
+                }
                 case OpCode.SetGlobal:
-                    var nameSetGlobal = ReadString();
-                    if (!_globals.ContainsKey(nameSetGlobal))
+                {
+                    var name = ReadString();
+                    if (!_globals.ContainsKey(name))
                     {
-                        RuntimeError("Undefined variable '", nameSetGlobal, "'.");
+                        RuntimeError("Undefined variable '", name, "'.");
                         return InterpretResult.RuntimeError;
                     }
 
-                    _globals[nameSetGlobal] = Peek(0);
+                    _globals[name] = Peek(0);
                     break;
+                }
                 case OpCode.Equal:
                     var b = Pop();
                     var a = Pop();
@@ -127,6 +137,28 @@ public class Vm
                     Pop().Print();
                     Console.WriteLine();
                     break;
+                case OpCode.Jump:
+                {
+                    var offset = ReadShort();
+                    _ip += offset;
+                    break;
+                }
+                case OpCode.JumpIfFalse:
+                {
+                    var offset = ReadShort();
+                    if (Peek(0).IsFalsey())
+                    {
+                        _ip += offset;
+                    }
+
+                    break;
+                }
+                case OpCode.Loop:
+                {
+                    var offset = ReadShort();
+                    _ip -= offset;
+                    break;
+                }
                 case OpCode.Return:
                     return InterpretResult.Ok;
                 default:
@@ -149,6 +181,12 @@ public class Vm
     private Value ReadConstant()
     {
         return _chunk!.ReadConstant(ReadByte());
+    }
+
+    private ushort ReadShort()
+    {
+        _ip += 2;
+        return (ushort)((_chunk!.ReadByte(_ip - 2) << 8) | _chunk!.ReadByte(_ip - 1));
     }
 
     private string ReadString()
@@ -217,7 +255,7 @@ public class Vm
         foreach (var msg in messages) Console.Error.Write(msg);
         Console.Error.WriteLine();
         var line = _chunk!.GetLineNumber(_ip);
-        Console.Error.WriteLine($"[line {line}] in script.");
+        Console.Error.WriteLine($"[Line {line}] in script.");
         ResetStack();
     }
 }

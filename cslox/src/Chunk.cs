@@ -22,6 +22,9 @@ internal enum OpCode : byte
     Not,
     Negate,
     Print,
+    Jump,
+    JumpIfFalse,
+    Loop,
     Return
 }
 
@@ -30,6 +33,7 @@ public class Chunk
     private readonly List<byte> _code = new();
     private readonly ValueArray _constants = new();
     private readonly List<int> _lines = new();
+    internal int Count => _code.Count;
 
     internal void WriteChunk(byte @byte, int line)
     {
@@ -98,6 +102,12 @@ public class Chunk
                 return SimpleInstruction("OP_NEGATE", offset);
             case OpCode.Print:
                 return SimpleInstruction("OP_PRINT", offset);
+            case OpCode.Jump:
+                return JumpInstruction("OP_JUMP", true, offset);
+            case OpCode.JumpIfFalse:
+                return JumpInstruction("OP_JUMP_IF_FALSE", true, offset);
+            case OpCode.Loop:
+                return JumpInstruction("OP_LOOP", false, offset);
             case OpCode.Return:
                 return SimpleInstruction("OP_RETURN", offset);
             default:
@@ -126,6 +136,23 @@ public class Chunk
         var slot = _code[offset + 1];
         Console.WriteLine($"{name,-16} {slot,4}");
         return offset + 2;
+    }
+
+    private int JumpInstruction(string name, bool sign, int offset)
+    {
+        var jump = (ushort)(_code[offset + 1] << 8);
+        jump |= _code[offset + 2];
+        Console.WriteLine($"{name,-16} {offset,4} -> {offset + 3 + (sign ? 1 : -1) * jump}");
+        return offset + 3;
+    }
+
+    internal bool PatchJump(int offset)
+    {
+        var jump = _code.Count - offset - 2;
+        // if (jump > ushort.MaxValue) return false;
+        _code[offset] = (byte)((jump >> 8) & 0xff);
+        _code[offset + 1] = (byte)(jump & 0xff);
+        return (jump <= ushort.MaxValue);
     }
 
     internal int AddConstant(Value value)

@@ -1,0 +1,42 @@
+print "one";
+print true;
+print 2 + 1;
+
+var beverage = "espresso";
+print beverage;
+
+var a_def = "before";
+print a_def; // "before".
+var a_def = "after";
+print a_def; // "after".
+
+var a_nil;
+print a_nil; // "nil".
+
+var a_assignment = "before";
+a_assignment = "value";
+a_assignment = 1;
+var b_assignment = "after";
+a_assignment = b_assignment = 2;
+
+{
+    var a = "global a";
+    var b = "global b";
+    var c = "global c";
+    {
+        var a = "outer a";
+        var b = "outer b";
+        {
+            var a = "inner a";
+            print a;
+            print b;
+            print c;
+        }
+        print a;
+        print b;
+        print c;
+    }
+    print a;
+    print b;
+    print c;
+}

@@ -10,8 +10,8 @@ internal class SubCompiler
 {
     public const int LocalMax = 256;
     public readonly Local[] Locals = new Local[LocalMax];
-    public int LocalCount = 0;
-    public int ScopeDepth = 0;
+    public int LocalCount;
+    public int ScopeDepth;
 }
 
 public class LoxCompiler
@@ -49,7 +49,7 @@ public class LoxCompiler
             [TokenType.Identifier] = new(Variable, null, Precedence.None),
             [TokenType.String] = new(String, null, Precedence.None),
             [TokenType.Number] = new(Number, null, Precedence.None),
-            [TokenType.And] = new(null, null, Precedence.None),
+            [TokenType.And] = new(null, And, Precedence.And),
             [TokenType.Class] = new(null, null, Precedence.None),
             [TokenType.Else] = new(null, null, Precedence.None),
             [TokenType.False] = new(Literal, null, Precedence.None),
@@ -57,7 +57,7 @@ public class LoxCompiler
             [TokenType.Fun] = new(null, null, Precedence.None),
             [TokenType.If] = new(null, null, Precedence.None),
             [TokenType.Nil] = new(Literal, null, Precedence.None),
-            [TokenType.Or] = new(null, null, Precedence.None),
+            [TokenType.Or] = new(null, Or, Precedence.Or),
             [TokenType.Print] = new(null, null, Precedence.None),
             [TokenType.Return] = new(null, null, Precedence.None),
             [TokenType.Super] = new(null, null, Precedence.None),
@@ -133,16 +133,23 @@ public class LoxCompiler
         DefineVariable(global);
     }
 
-    // statement      → exprStmt
-    //                | printStmt
-    //                | block ;
-    //
-    // block          → "{" declaration* "}" ;
     private void Statement()
     {
         if (Match(TokenType.Print))
         {
             PrintStatement();
+        }
+        else if (Match(TokenType.If))
+        {
+            IfStatement();
+        }
+        else if (Match(TokenType.While))
+        {
+            WhileStatement();
+        }
+        else if (Match(TokenType.For))
+        {
+            ForStatement();
         }
         else if (Match(TokenType.LeftBrace))
         {
@@ -161,6 +168,96 @@ public class LoxCompiler
         Expression();
         Consume(TokenType.Semicolon, "Expect ';' after value.");
         EmitByte(OpCode.Print);
+    }
+
+    private void IfStatement()
+    {
+        Consume(TokenType.LeftParen, "Expect '(' after 'if'.");
+        Expression();
+        Consume(TokenType.RightParen, "Expect ')' after condition.");
+
+        var thenJump = EmitJump(OpCode.JumpIfFalse);
+        EmitByte(OpCode.Pop);
+        Statement();
+        var elseJump = EmitJump(OpCode.Jump);
+        PatchJump(thenJump);
+        EmitByte(OpCode.Pop);
+
+        if (Match(TokenType.Else))
+        {
+            Statement();
+        }
+
+        PatchJump(elseJump);
+    }
+
+    private void WhileStatement()
+    {
+        int loopStart = _chunk!.Count;
+        Consume(TokenType.LeftParen, "Expect '(' after 'while'.");
+        Expression();
+        Consume(TokenType.RightParen, "Expect ')' after condition.");
+
+        var exitJump = EmitJump(OpCode.JumpIfFalse);
+        EmitByte(OpCode.Pop);
+        Statement();
+        EmitLoop(loopStart);
+
+        PatchJump(exitJump);
+        EmitByte(OpCode.Pop);
+    }
+
+    private void ForStatement()
+    {
+        BeginScope();
+        Consume(TokenType.LeftParen, "Expect '(' after 'for'.");
+        if (Match(TokenType.Semicolon))
+        {
+            // No initializer.
+        }
+        else if (Match(TokenType.Var))
+        {
+            VarDeclaration();
+        }
+        else
+        {
+            ExpressionStatement();
+        }
+
+        var loopStart = _chunk!.Count;
+        var exitJump = -1;
+        if (!Match(TokenType.Semicolon))
+        {
+            Expression();
+            Consume(TokenType.Semicolon, "Expect ';' after loop condition.");
+
+            exitJump = EmitJump(OpCode.JumpIfFalse);
+            EmitByte(OpCode.Pop);
+        }
+
+        if (!Match(TokenType.RightParen))
+        {
+            var bodyJump = EmitJump(OpCode.Jump);
+            var incrementStart = _chunk!.Count;
+            Expression();
+            EmitByte(OpCode.Pop);
+            Consume(TokenType.RightParen, "Expect ')' after for clauses.");
+
+            EmitLoop(loopStart);
+            loopStart = incrementStart;
+            PatchJump(bodyJump);
+        }
+
+        Statement();
+        EmitLoop(loopStart);
+
+        if (exitJump != -1)
+        {
+            PatchJump(exitJump);
+            EmitByte(OpCode.Pop);
+        }
+
+        EndScope();
     }
 
     private void BeginScope()
@@ -305,7 +402,7 @@ public class LoxCompiler
         _current.Locals[_current.LocalCount - 1].Depth = _current.ScopeDepth;
     }
 
-    internal int ResolveLocal(SubCompiler compiler, string name)
+    private int ResolveLocal(SubCompiler compiler, string name)
     {
         for (var i = compiler.LocalCount - 1; i >= 0; i--)
         {
@@ -358,6 +455,35 @@ public class LoxCompiler
     {
         EmitByte(byte1);
         EmitByte(byte2);
+    }
+
+    private void EmitLoop(int loopStart)
+    {
+        EmitByte(OpCode.Loop);
+        var offset = _chunk!.Count - loopStart + 2;
+        if (offset > ushort.MaxValue)
+        {
+            _parser!.Error("Loop body is too large.");
+        }
+
+        EmitByte((byte)((offset >> 8) & 0xff));
+        EmitByte((byte)(offset & 0xff));
+    }
+
+    private int EmitJump(OpCode instruction)
+    {
+        EmitByte(instruction);
+        EmitByte(byte.MaxValue);
+        EmitByte(byte.MaxValue);
+        return _chunk!.Count - 2;
+    }
+
+    private void PatchJump(int offset)
+    {
+        if (!_chunk!.PatchJump(offset))
+        {
+            _parser!.Error("Too much code to jump over.");
+        }
     }
 
     private void EndCompiler()
@@ -517,6 +643,24 @@ public class LoxCompiler
         {
             EmitBytes(getOp, arg);
         }
+    }
+
+    private void And(bool canAssign)
+    {
+        var endJump = EmitJump(OpCode.JumpIfFalse);
+        EmitByte(OpCode.Pop);
+        ParsePrecedence(Precedence.And);
+        PatchJump(endJump);
+    }
+
+    private void Or(bool canAssign)
+    {
+        var elseJump = EmitJump(OpCode.JumpIfFalse);
+        var endJump = EmitJump(OpCode.Jump);
+        PatchJump(elseJump);
+        EmitByte(OpCode.Pop);
+        ParsePrecedence(Precedence.Or);
+        PatchJump(endJump);
     }
 
     private void Synchronize()

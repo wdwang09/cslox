@@ -1,0 +1,60 @@
+var a=5;
+
+if (a > 2) {
+    print "then";
+}
+
+if (a > 10) {
+    print "then";
+} else {
+    print "else";
+}
+
+if (a > 2) {
+    print "then";
+} else {
+    print "else";
+}
+
+if (a > 5) {
+    print "then";
+}
+else if (a > 2) {
+    print "else if";
+}
+else {
+    print "else";
+}
+
+if (a > 10) {
+    print "then";
+}
+else if (a > 7) {
+    print "else if";
+}
+else {
+    print "else";
+}
+
+// =====
+
+a = 3;
+while (a >= 1) {
+    print a;
+    a = a - 1;
+}
+
+// =====
+
+for (var b=0; b < 3; b=b+1) {
+    print b;
+}
+
+for (var b=0; b > 3; b=b+1) {
+    print b;
+}
+
+a = 3;
+for (; a >= 0; a=a-1) {
+    print a;
+}
