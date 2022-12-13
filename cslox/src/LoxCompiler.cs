@@ -1,5 +1,11 @@
 ﻿namespace cslox;
 
+internal enum FunctionType
+{
+    Function,
+    Script
+}
+
 internal struct Local
 {
     internal string Name;
@@ -8,26 +14,44 @@ internal struct Local
 
 internal class SubCompiler
 {
-    public const int LocalMax = 256;
-    public readonly Local[] Locals = new Local[LocalMax];
-    public int LocalCount;
-    public int ScopeDepth;
+    internal const int LocalMax = 256;
+    internal readonly Local[] Locals = new Local[LocalMax];
+    internal int LocalCount;
+    internal int ScopeDepth;
+    internal readonly ObjFunction Function;
+    internal readonly FunctionType Type;
+    internal readonly SubCompiler? Enclosing;
+
+    internal SubCompiler(SubCompiler? compiler, FunctionType type, string functionName = "")
+    {
+        Enclosing = compiler;
+        Type = type;
+        if (type == FunctionType.Script)
+        {
+            functionName = "";
+        }
+
+        Function = new ObjFunction(functionName);
+
+        ref var local = ref Locals[LocalCount++];
+        local.Depth = 0;
+        local.Name = "";
+    }
 }
 
 public class LoxCompiler
 {
     private readonly Dictionary<TokenType, ParseRule> _rules;
     private readonly Vm _vm = new();
-    private Chunk? _chunk;
     private Scanner? _scanner;
     private Parser? _parser;
-    private readonly SubCompiler _current = new();
+    private SubCompiler? _current;
 
     public LoxCompiler()
     {
         _rules = new Dictionary<TokenType, ParseRule>
         {
-            [TokenType.LeftParen] = new(Grouping, null, Precedence.None),
+            [TokenType.LeftParen] = new(Grouping, Call, Precedence.Call),
             [TokenType.RightParen] = new(null, null, Precedence.None),
             [TokenType.LeftBrace] = new(null, null, Precedence.None),
             [TokenType.RightBrace] = new(null, null, Precedence.None),
@@ -70,19 +94,33 @@ public class LoxCompiler
         };
     }
 
-    internal bool Compile(string source)
+    internal InterpretResult CompileAndRun(string source)
+    {
+#if DEBUG
+        var line = new string('=', 45);
+        Console.WriteLine(line);
+#endif
+        var function = Compile(source);
+#if DEBUG
+        Console.WriteLine(line);
+#endif
+        if (function is null) return InterpretResult.CompileError;
+        return _vm.Interpret(function);
+    }
+
+    private ObjFunction? Compile(string source)
     {
         _scanner = new Scanner(source);
-        _chunk = new Chunk();
         _parser = new Parser();
+        _current = new SubCompiler(null, FunctionType.Script);
         Advance();
         while (!Match(TokenType.Eof))
         {
             Declaration();
         }
 
-        EndCompiler();
-        return !_parser.HadError;
+        var function = EndCompiler();
+        return _parser.HadError ? null : function;
     }
 
     private bool Match(TokenType type)
@@ -97,11 +135,13 @@ public class LoxCompiler
         return _parser!.Current!.Value.Type == type;
     }
 
-    // declaration    → varDecl
-    //                | statement ;
     private void Declaration()
     {
-        if (Match(TokenType.Var))
+        if (Match(TokenType.Fun))
+        {
+            FunDeclaration();
+        }
+        else if (Match(TokenType.Var))
         {
             VarDeclaration();
         }
@@ -114,6 +154,14 @@ public class LoxCompiler
         {
             Synchronize();
         }
+    }
+
+    private void FunDeclaration()
+    {
+        var global = ParseVariable("Expect function name.");
+        MarkInitialized();
+        Function(FunctionType.Function);
+        DefineVariable(global);
     }
 
     private void VarDeclaration()
@@ -142,6 +190,10 @@ public class LoxCompiler
         else if (Match(TokenType.If))
         {
             IfStatement();
+        }
+        else if (Match(TokenType.Return))
+        {
+            ReturnStatement();
         }
         else if (Match(TokenType.While))
         {
@@ -191,9 +243,28 @@ public class LoxCompiler
         PatchJump(elseJump);
     }
 
+    private void ReturnStatement()
+    {
+        if (_current!.Type == FunctionType.Script)
+        {
+            _parser!.Error("Can't return from top-level code.");
+        }
+
+        if (Match(TokenType.Semicolon))
+        {
+            EmitReturn();
+        }
+        else
+        {
+            Expression();
+            Consume(TokenType.Semicolon, "Expect ';' after return value.");
+            EmitByte(OpCode.Return);
+        }
+    }
+
     private void WhileStatement()
     {
-        int loopStart = _chunk!.Count;
+        var loopStart = CurrentChunk().Count;
         Consume(TokenType.LeftParen, "Expect '(' after 'while'.");
         Expression();
         Consume(TokenType.RightParen, "Expect ')' after condition.");
@@ -224,7 +295,7 @@ public class LoxCompiler
             ExpressionStatement();
         }
 
-        var loopStart = _chunk!.Count;
+        var loopStart = CurrentChunk().Count;
         var exitJump = -1;
         if (!Match(TokenType.Semicolon))
         {
@@ -238,7 +309,7 @@ public class LoxCompiler
         if (!Match(TokenType.RightParen))
         {
             var bodyJump = EmitJump(OpCode.Jump);
-            var incrementStart = _chunk!.Count;
+            var incrementStart = CurrentChunk().Count;
             Expression();
             EmitByte(OpCode.Pop);
             Consume(TokenType.RightParen, "Expect ')' after for clauses.");
@@ -262,17 +333,17 @@ public class LoxCompiler
 
     private void BeginScope()
     {
-        _current.ScopeDepth++;
+        _current!.ScopeDepth++;
     }
 
     private void EndScope()
     {
-        _current.ScopeDepth--;
-        while (_current.LocalCount > 0 &&
-               _current.Locals[_current.LocalCount - 1].Depth > _current.ScopeDepth)
+        _current!.ScopeDepth--;
+        while (_current!.LocalCount > 0 &&
+               _current!.Locals[_current!.LocalCount - 1].Depth > _current!.ScopeDepth)
         {
             EmitByte(OpCode.Pop);
-            _current.LocalCount--;
+            _current!.LocalCount--;
         }
     }
 
@@ -291,12 +362,6 @@ public class LoxCompiler
         Expression();
         Consume(TokenType.Semicolon, "Expect ';' after expression.");
         EmitByte(OpCode.Pop);
-    }
-
-    internal InterpretResult Run()
-    {
-        if (_chunk is null) return InterpretResult.CompileError;
-        return _vm.Interpret(_chunk);
     }
 
     private void Advance()
@@ -347,19 +412,19 @@ public class LoxCompiler
         Consume(TokenType.Identifier, errorMessage);
 
         DeclareVariable();
-        if (_current.ScopeDepth > 0) return 0;
+        if (_current!.ScopeDepth > 0) return 0;
 
         return IdentifierConstant(_parser!.Previous!.Value);
     }
 
     private void DeclareVariable()
     {
-        if (_current.ScopeDepth == 0) return;
+        if (_current!.ScopeDepth == 0) return;
         var name = _parser!.Previous!.Value.Lexeme;
-        for (var i = _current.LocalCount - 1; i >= 0; i--)
+        for (var i = _current!.LocalCount - 1; i >= 0; i--)
         {
-            ref var local = ref _current.Locals[i];
-            if (local.Depth != -1 && local.Depth < _current.ScopeDepth)
+            ref var local = ref _current!.Locals[i];
+            if (local.Depth != -1 && local.Depth < _current!.ScopeDepth)
             {
                 break;
             }
@@ -375,20 +440,20 @@ public class LoxCompiler
 
     private void AddLocal(string name)
     {
-        if (_current.LocalCount == SubCompiler.LocalMax)
+        if (_current!.LocalCount == SubCompiler.LocalMax)
         {
             _parser!.Error("Too many local variables in function.");
             return;
         }
 
-        ref var local = ref _current.Locals[_current.LocalCount++];
+        ref var local = ref _current!.Locals[_current!.LocalCount++];
         local.Name = name;
         local.Depth = -1;
     }
 
     private void DefineVariable(byte global)
     {
-        if (_current.ScopeDepth > 0)
+        if (_current!.ScopeDepth > 0)
         {
             MarkInitialized();
             return;
@@ -399,7 +464,41 @@ public class LoxCompiler
 
     private void MarkInitialized()
     {
-        _current.Locals[_current.LocalCount - 1].Depth = _current.ScopeDepth;
+        if (_current!.ScopeDepth == 0) return;
+        _current!.Locals[_current!.LocalCount - 1].Depth = _current!.ScopeDepth;
+    }
+
+    private void Function(FunctionType type)
+    {
+        var possibleFunctionName = "";
+        if (type != FunctionType.Script)
+        {
+            possibleFunctionName = _parser!.Previous!.Value.Lexeme;
+        }
+
+        _current = new SubCompiler(_current, type, possibleFunctionName);
+        BeginScope();
+        Consume(TokenType.LeftParen, "Expect '(' after function name.");
+        if (!Check(TokenType.RightParen))
+        {
+            do
+            {
+                _current.Function.Arity++;
+                if (_current.Function.Arity > 255)
+                {
+                    _parser!.ErrorAtCurrent("Can't have more than 255 parameters.");
+                }
+
+                var constant = ParseVariable("Expect parameter name.");
+                DefineVariable(constant);
+            } while (Match(TokenType.Comma));
+        }
+
+        Consume(TokenType.RightParen, "Expect ')' after parameters.");
+        Consume(TokenType.LeftBrace, "Expect '{' before function body.");
+        Block();
+        var function = EndCompiler();
+        EmitBytes(OpCode.Constant, MakeConstant(new Value(function)));
     }
 
     private int ResolveLocal(SubCompiler compiler, string name)
@@ -437,12 +536,12 @@ public class LoxCompiler
 
     private void EmitByte(byte @byte)
     {
-        _chunk!.WriteChunk(@byte, _parser!.Previous!.Value.Line);
+        CurrentChunk().WriteChunk(@byte, _parser!.Previous!.Value.Line);
     }
 
     private void EmitByte(OpCode @byte)
     {
-        _chunk!.WriteChunk((byte)@byte, _parser!.Previous!.Value.Line);
+        CurrentChunk().WriteChunk((byte)@byte, _parser!.Previous!.Value.Line);
     }
 
     private void EmitBytes(OpCode byte1, byte byte2)
@@ -460,7 +559,7 @@ public class LoxCompiler
     private void EmitLoop(int loopStart)
     {
         EmitByte(OpCode.Loop);
-        var offset = _chunk!.Count - loopStart + 2;
+        var offset = CurrentChunk().Count - loopStart + 2;
         if (offset > ushort.MaxValue)
         {
             _parser!.Error("Loop body is too large.");
@@ -475,27 +574,35 @@ public class LoxCompiler
         EmitByte(instruction);
         EmitByte(byte.MaxValue);
         EmitByte(byte.MaxValue);
-        return _chunk!.Count - 2;
+        return CurrentChunk().Count - 2;
     }
 
     private void PatchJump(int offset)
     {
-        if (!_chunk!.PatchJump(offset))
+        if (!CurrentChunk().PatchJump(offset))
         {
             _parser!.Error("Too much code to jump over.");
         }
     }
 
-    private void EndCompiler()
+    private ObjFunction EndCompiler()
     {
         EmitReturn();
+        var function = _current!.Function;
 #if DEBUG
-        if (!_parser!.HadError) _chunk!.DisassembleChunk("code");
+        if (!_parser!.HadError)
+        {
+            var name = function.Name.Length > 0 ? function.Name : "<script>";
+            CurrentChunk().DisassembleChunk(name);
+        }
 #endif
+        _current = _current.Enclosing;
+        return function;
     }
 
     private void EmitReturn()
     {
+        EmitByte(OpCode.Nil);
         EmitByte(OpCode.Return);
     }
 
@@ -506,7 +613,7 @@ public class LoxCompiler
 
     private byte MakeConstant(Value value)
     {
-        var constant = _chunk!.AddConstant(value);
+        var constant = CurrentChunk().AddConstant(value);
         if (constant > byte.MaxValue)
         {
             _parser!.Error("Too many constants in one chunk.");
@@ -587,6 +694,33 @@ public class LoxCompiler
         }
     }
 
+    private void Call(bool canAssign)
+    {
+        var argCount = ArgumentList();
+        EmitBytes(OpCode.Call, argCount);
+    }
+
+    private byte ArgumentList()
+    {
+        byte argCount = 0;
+        if (!Check(TokenType.RightParen))
+        {
+            do
+            {
+                Expression();
+                if (argCount == 255)
+                {
+                    _parser!.Error("Can't have more than 255 arguments.");
+                }
+
+                argCount++;
+            } while (Match(TokenType.Comma));
+        }
+
+        Consume(TokenType.RightParen, "Expect ')' after arguments.");
+        return argCount;
+    }
+
     private void Literal(bool canAssign)
     {
         switch (_parser!.Previous!.Value.Type)
@@ -619,7 +753,7 @@ public class LoxCompiler
     private void NamedVariable(Token name, bool canAssign)
     {
         OpCode getOp, setOp;
-        var argResolveLocal = ResolveLocal(_current, name.Lexeme);
+        var argResolveLocal = ResolveLocal(_current!, name.Lexeme);
         byte arg;
         if (argResolveLocal != -1)
         {
@@ -684,5 +818,10 @@ public class LoxCompiler
 
             Advance();
         }
+    }
+
+    private Chunk CurrentChunk()
+    {
+        return _current!.Function.Chunk;
     }
 }

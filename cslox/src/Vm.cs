@@ -1,5 +1,34 @@
 ﻿namespace cslox;
 
+internal struct CallFrame
+{
+    internal ObjFunction Function;
+    internal int Ip;
+    internal int Slots;
+
+    internal byte ReadByte()
+    {
+        return Function.Chunk.ReadByte(Ip++);
+    }
+
+    internal Value ReadConstant()
+    {
+        return Function.Chunk.ReadConstant(ReadByte());
+    }
+
+    internal ushort ReadShort()
+    {
+        Ip += 2;
+        var readByte = Function.Chunk.ReadByte;
+        return (ushort)((readByte(Ip - 2) << 8) | readByte(Ip - 1));
+    }
+
+    internal string ReadString()
+    {
+        return ReadConstant().String;
+    }
+}
+
 public enum InterpretResult
 {
     Ok,
@@ -7,29 +36,37 @@ public enum InterpretResult
     RuntimeError
 }
 
-public class Vm
+internal class Vm
 {
-    private const int StackMax = 256;
+    private const int FramesMax = 64;
+    private readonly CallFrame[] _frames = new CallFrame[FramesMax];
+    private int _frameCount;
+    private const int StackMax = 256 * FramesMax;
     private readonly Value[] _stack = new Value[StackMax];
-    private Chunk? _chunk;
-    private int _ip;
     private int _stackTop;
     private readonly Dictionary<string, Value> _globals = new();
 
-    public InterpretResult Interpret(Chunk chunk)
+    internal Vm()
     {
-        _chunk = chunk;
-        _ip = 0;
+        DefineNative("clock", ObjNative.ClockNative);
+    }
+
+    public InterpretResult Interpret(ObjFunction function)
+    {
+        Push(new Value(function));
+        Call(function, 0);
         return Run();
     }
 
     private void ResetStack()
     {
         _stackTop = 0;
+        _frameCount = 0;
     }
 
     private InterpretResult Run()
     {
+        ref var frame = ref _frames[_frameCount - 1];
         while (true)
         {
 #if DEBUG
@@ -38,20 +75,21 @@ public class Vm
             {
                 Console.Write("[");
                 _stack[i].Print();
-                // ValueArray.PrintValue(_stack[i]);
                 Console.Write("]");
             }
 
             Console.WriteLine();
-            _chunk!.DisassembleInstruction(_ip);
+            frame.Function.Chunk.DisassembleInstruction(frame.Ip);
 #endif
-            var instruction = ReadByte();
+            var instruction = frame.ReadByte();
             switch ((OpCode)instruction)
             {
                 case OpCode.Constant:
-                    var constant = ReadConstant();
+                {
+                    var constant = frame.ReadConstant();
                     Push(constant);
                     break;
+                }
                 case OpCode.Nil:
                     Push(new Value());
                     break;
@@ -66,22 +104,22 @@ public class Vm
                     break;
                 case OpCode.GetLocal:
                 {
-                    var slot = ReadByte();
-                    Push(_stack[slot]);
+                    var slot = frame.ReadByte();
+                    Push(_stack[slot + frame.Slots]);
                     break;
                 }
                 case OpCode.SetLocal:
                 {
-                    var slot = ReadByte();
-                    _stack[slot] = Peek(0);
+                    var slot = frame.ReadByte();
+                    _stack[slot + frame.Slots] = Peek(0);
                     break;
                 }
                 case OpCode.GetGlobal:
                 {
-                    var name = ReadString();
+                    var name = frame.ReadString();
                     if (!_globals.ContainsKey(name))
                     {
-                        RuntimeError("Undefined variable '", name, "'.");
+                        RuntimeError("Undefined variable when getting: '", name, "'.");
                         return InterpretResult.RuntimeError;
                     }
 
@@ -90,17 +128,17 @@ public class Vm
                 }
                 case OpCode.DefineGlobal:
                 {
-                    var name = ReadString();
+                    var name = frame.ReadString();
                     _globals[name] = Peek(0);
                     Pop();
                     break;
                 }
                 case OpCode.SetGlobal:
                 {
-                    var name = ReadString();
+                    var name = frame.ReadString();
                     if (!_globals.ContainsKey(name))
                     {
-                        RuntimeError("Undefined variable '", name, "'.");
+                        RuntimeError("Undefined variable when setting: '", name, "'.");
                         return InterpretResult.RuntimeError;
                     }
 
@@ -108,19 +146,23 @@ public class Vm
                     break;
                 }
                 case OpCode.Equal:
+                {
                     var b = Pop();
                     var a = Pop();
                     Push(new Value(a.Equal(b)));
                     break;
+                }
                 case OpCode.Greater:
                 case OpCode.Less:
                 case OpCode.Add:
                 case OpCode.Subtract:
                 case OpCode.Multiply:
                 case OpCode.Divide:
+                {
                     var result = BinaryOp((OpCode)instruction);
                     if (result != InterpretResult.Ok) return result;
                     break;
+                }
                 case OpCode.Not:
                     Push(new Value(Pop().IsFalsey()));
                     break;
@@ -139,28 +181,52 @@ public class Vm
                     break;
                 case OpCode.Jump:
                 {
-                    var offset = ReadShort();
-                    _ip += offset;
+                    var offset = frame.ReadShort();
+                    frame.Ip += offset;
                     break;
                 }
                 case OpCode.JumpIfFalse:
                 {
-                    var offset = ReadShort();
+                    var offset = frame.ReadShort();
                     if (Peek(0).IsFalsey())
                     {
-                        _ip += offset;
+                        frame.Ip += offset;
                     }
 
                     break;
                 }
                 case OpCode.Loop:
                 {
-                    var offset = ReadShort();
-                    _ip -= offset;
+                    var offset = frame.ReadShort();
+                    frame.Ip -= offset;
+                    break;
+                }
+                case OpCode.Call:
+                {
+                    var argCount = frame.ReadByte();
+                    if (!CallValue(Peek(argCount), argCount))
+                    {
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    frame = ref _frames[_frameCount - 1];
                     break;
                 }
                 case OpCode.Return:
-                    return InterpretResult.Ok;
+                {
+                    var result = Pop();
+                    _frameCount--;
+                    if (_frameCount == 0)
+                    {
+                        Pop();
+                        return InterpretResult.Ok;
+                    }
+
+                    _stackTop = frame.Slots;
+                    Push(result);
+                    frame = ref _frames[_frameCount - 1];
+                    break;
+                }
                 default:
                     Console.Error.WriteLine($"Unknown opcode {instruction}.");
                     return InterpretResult.CompileError;
@@ -171,27 +237,6 @@ public class Vm
     private Value Peek(int distance)
     {
         return _stack[_stackTop - 1 - distance];
-    }
-
-    private byte ReadByte()
-    {
-        return _chunk!.ReadByte(_ip++);
-    }
-
-    private Value ReadConstant()
-    {
-        return _chunk!.ReadConstant(ReadByte());
-    }
-
-    private ushort ReadShort()
-    {
-        _ip += 2;
-        return (ushort)((_chunk!.ReadByte(_ip - 2) << 8) | _chunk!.ReadByte(_ip - 1));
-    }
-
-    private string ReadString()
-    {
-        return ReadConstant().String;
     }
 
     private void Push(Value value)
@@ -250,12 +295,81 @@ public class Vm
         return InterpretResult.Ok;
     }
 
+    private bool CallValue(Value callee, int argCount)
+    {
+        if (callee.IsObj())
+        {
+            switch (callee.Obj.Type)
+            {
+                case ObjType.Function:
+                    return Call((ObjFunction)callee.Obj, argCount);
+                case ObjType.Native:
+                {
+                    var native = ((ObjNative)callee.Obj).Function;
+                    var argList = new List<Value>();
+                    for (var i = 0; i < argCount; ++i)
+                    {
+                        argList.Add(_stack[_stackTop - i - 1]);
+                    }
+
+                    var result = native(argCount, argList);
+                    _stackTop -= argCount + 1;
+                    Push(result);
+                    return true;
+                }
+                default:
+                    Console.Error.WriteLine("Unsupported.");
+                    break;
+            }
+        }
+
+        RuntimeError("Can only call functions and classes.");
+        return false;
+    }
+
+    private bool Call(ObjFunction function, int argCount)
+    {
+        if (argCount != function.Arity)
+        {
+            RuntimeError($"Expected {function.Arity} arguments but got {argCount}.");
+            return false;
+        }
+
+        if (_frameCount == FramesMax)
+        {
+            RuntimeError("Stack overflow.");
+            return false;
+        }
+
+        ref var frame = ref _frames[_frameCount++];
+        frame.Function = function;
+        frame.Ip = 0;
+        frame.Slots = _stackTop - argCount - 1;
+        return true;
+    }
+
     private void RuntimeError(params string[] messages)
     {
         foreach (var msg in messages) Console.Error.Write(msg);
         Console.Error.WriteLine();
-        var line = _chunk!.GetLineNumber(_ip);
-        Console.Error.WriteLine($"[Line {line}] in script.");
+        for (var i = _frameCount - 1; i >= 0; i--)
+        {
+            ref var frame = ref _frames[i];
+            ref var function = ref frame.Function;
+            var instruction = frame.Ip - 1;
+            Console.Error.Write($"[Line {function.Chunk.GetLineNumber(instruction)}] in ");
+            Console.Error.WriteLine(function.Name == "" ? "script" : $"{function.Name}()");
+        }
+
         ResetStack();
+    }
+
+    private void DefineNative(string name, NativeFn function)
+    {
+        Push(new Value(name));
+        Push(new Value(new ObjNative(function)));
+        _globals[_stack[0].String] = _stack[1];
+        Pop();
+        Pop();
     }
 }

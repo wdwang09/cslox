@@ -280,7 +280,11 @@ public class Scanner
     private TokenType CheckKeyWord(int start, int length, string keyword, TokenType type)
     {
         // use whole keyword rather than "rest": "or" => "for", "ue" => "true"
-        if (_current - _start == start + length && _source.Substring(_start, start + length) == keyword) return type;
+        if (_current - _start == start + length &&
+            _source.Substring(_start, start + length) == keyword)
+        {
+            return type;
+        }
 
         return TokenType.Identifier;
     }

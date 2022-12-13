@@ -25,6 +25,7 @@ internal enum OpCode : byte
     Jump,
     JumpIfFalse,
     Loop,
+    Call,
     Return
 }
 
@@ -43,11 +44,14 @@ public class Chunk
 
     internal void DisassembleChunk(string name)
     {
-        var header = $"===== {name} =====";
+        var header = $" {name} ";
+        var len = Math.Max(0, (45 - header.Length));
+        header = new string('-', len / 2) + header +
+                 new string('-', len - len / 2);
         Console.WriteLine(header);
         var offset = 0;
         while (offset < _code.Count) offset = DisassembleInstruction(offset);
-        Console.WriteLine(new string('=', header.Length));
+        Console.WriteLine(new string('-', header.Length));
     }
 
     internal int DisassembleInstruction(int offset)
@@ -108,6 +112,8 @@ public class Chunk
                 return JumpInstruction("OP_JUMP_IF_FALSE", true, offset);
             case OpCode.Loop:
                 return JumpInstruction("OP_LOOP", false, offset);
+            case OpCode.Call:
+                return ByteInstruction("OP_CALL", offset);
             case OpCode.Return:
                 return SimpleInstruction("OP_RETURN", offset);
             default:

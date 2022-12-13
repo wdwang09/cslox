@@ -1,0 +1,43 @@
+fun sum(a, b, c) {
+  return a + b + c;
+}
+
+print 1 + sum(2, 3, 4);
+
+// =====
+
+fun count(m, n) {
+    if (m > n) count(m - 1, m);
+    print m;
+}
+count(3, 0);
+
+// =====
+
+fun sayHi(first, last) {
+    print "Hi, " + first + " " + last + "!";
+}
+sayHi("Dear", "Reader");
+print sayHi("A", "B");
+
+// =====
+
+fun f() {
+    return "f()";
+}
+print f();
+
+// =====
+
+fun fib(n) {
+    // 0 1 1 2 3
+    // 5 8 13 21 34
+    // 55 89 144 233 377
+    // 610 987 1597 2584 4181
+    if (n <= 1) return n;
+    return fib(n - 2) + fib(n - 1);
+}
+var t1 = clock();
+print fib(30);
+var t2 = clock();
+print t2-t1;

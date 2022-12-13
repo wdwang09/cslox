@@ -12,7 +12,7 @@ internal enum Precedence
     Factor, // * /
     Unary, // ! -
     Call, // . ()
-    Primary
+    // Primary
 }
 
 internal delegate void ParseFn(bool canAssign);

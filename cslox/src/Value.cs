@@ -35,7 +35,6 @@ internal readonly struct Value
         String = value;
     }
 
-    [Obsolete]
     public Value(Obj obj)
     {
         _type = ValueType.Obj;
@@ -62,14 +61,12 @@ internal readonly struct Value
         return _type == ValueType.String;
     }
 
-    [Obsolete]
     internal bool IsObj()
     {
         return _type == ValueType.Obj;
     }
 
-    [Obsolete]
-    internal bool IsObjType(ObjType objType)
+    private bool IsObjType(ObjType objType)
     {
         return IsObj() && Obj.Type == objType;
     }
@@ -102,6 +99,8 @@ internal readonly struct Value
             Console.Write(Number);
         else if (IsString())
             Console.Write("\"" + String + "\"");
+        else if (IsObjType(ObjType.Function))
+            Console.Write(Obj.ToString());
         else
         {
             Console.Error.Write("[Unsupported]");
@@ -113,9 +112,8 @@ internal readonly struct Value
     internal double Number { get; } = 0;
     internal string String { get; } = "";
 
-    [Obsolete] private readonly Obj? _obj = null;
+    private readonly Obj? _obj = null;
 
-    [Obsolete]
     internal Obj Obj
     {
         get
