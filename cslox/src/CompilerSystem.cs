@@ -1,53 +1,5 @@
 ﻿namespace cslox;
 
-internal enum FunctionType
-{
-    Function,
-    Script
-}
-
-internal struct Local
-{
-    internal string Name;
-    internal int Depth;
-    internal bool IsCaptured;
-}
-
-internal struct Upvalue
-{
-    internal byte Index;
-    internal bool IsLocal;
-}
-
-internal class SubCompiler
-{
-    internal const int LocalMax = 256;
-    internal readonly Local[] Locals = new Local[LocalMax];
-    internal int LocalCount;
-    internal const int UpvalueMax = 256;
-    internal readonly Upvalue[] Upvalues = new Upvalue[UpvalueMax];
-    internal int ScopeDepth;
-    internal readonly ObjFunction Function;
-    internal readonly FunctionType Type;
-    internal readonly SubCompiler? Enclosing;
-
-    internal SubCompiler(SubCompiler? compiler, FunctionType type, string functionName = "")
-    {
-        Enclosing = compiler;
-        Type = type;
-        if (type == FunctionType.Script)
-        {
-            functionName = "";
-        }
-
-        Function = new ObjFunction(functionName);
-
-        ref var local = ref Locals[LocalCount++];
-        local.Depth = 0;
-        local.Name = "";
-    }
-}
-
 public class CompilerSystem
 {
     private readonly Dictionary<TokenType, ParseRule> _rules;
@@ -55,6 +7,7 @@ public class CompilerSystem
     private Scanner? _scanner;
     private Parser? _parser;
     private SubCompiler? _current;
+    private ClassCompiler? _currentClass;
 
     public CompilerSystem()
     {
@@ -94,7 +47,7 @@ public class CompilerSystem
             [TokenType.Print] = new(null, null, Precedence.None),
             [TokenType.Return] = new(null, null, Precedence.None),
             [TokenType.Super] = new(null, null, Precedence.None),
-            [TokenType.This] = new(null, null, Precedence.None),
+            [TokenType.This] = new(This, null, Precedence.None),
             [TokenType.True] = new(Literal, null, Precedence.None),
             [TokenType.Var] = new(null, null, Precedence.None),
             [TokenType.While] = new(null, null, Precedence.None),
@@ -171,14 +124,27 @@ public class CompilerSystem
     private void ClassDeclaration()
     {
         Consume(TokenType.Identifier, "Expect class name.");
+        var className = _parser!.Previous!.Value;
         var nameConstant = IdentifierConstant(_parser!.Previous!.Value);
         DeclareVariable();
 
         EmitBytes(OpCode.Class, nameConstant);
         DefineVariable(nameConstant);
 
+        var classCompiler = new ClassCompiler(_currentClass);
+        _currentClass = classCompiler;
+
+        NamedVariable(className, false);
         Consume(TokenType.LeftBrace, "Expect '{' before class body.");
+        while (!Check(TokenType.RightBrace) && !Check(TokenType.Eof))
+        {
+            Method();
+        }
+
         Consume(TokenType.RightBrace, "Expect '}' after class body.");
+        EmitByte(OpCode.Pop);
+
+        _currentClass = _currentClass.Enclosing;
     }
 
     private void FunDeclaration()
@@ -281,6 +247,11 @@ public class CompilerSystem
         }
         else
         {
+            if (_current!.Type == FunctionType.Initializer)
+            {
+                _parser!.Error("Can't return a value from an initializer.");
+            }
+
             Expression();
             Consume(TokenType.Semicolon, "Expect ';' after return value.");
             EmitByte(OpCode.Return);
@@ -535,6 +506,21 @@ public class CompilerSystem
         }
     }
 
+    private void Method()
+    {
+        Consume(TokenType.Identifier, "Expect method name.");
+        var constant = IdentifierConstant(_parser!.Previous!.Value);
+
+        var type = FunctionType.Method;
+        if (_parser!.Previous!.Value.Lexeme == ObjClass.InitString)
+        {
+            type = FunctionType.Initializer;
+        }
+
+        Function(type);
+        EmitBytes(OpCode.Method, constant);
+    }
+
     private int ResolveLocal(SubCompiler compiler, string name)
     {
         for (var i = compiler.LocalCount - 1; i >= 0; i--)
@@ -678,7 +664,15 @@ public class CompilerSystem
 
     private void EmitReturn()
     {
-        EmitByte(OpCode.Nil);
+        if (_current!.Type == FunctionType.Initializer)
+        {
+            EmitBytes(OpCode.GetLocal, (byte)0);
+        }
+        else
+        {
+            EmitByte(OpCode.Nil);
+        }
+
         EmitByte(OpCode.Return);
     }
 
@@ -786,6 +780,12 @@ public class CompilerSystem
             Expression();
             EmitBytes(OpCode.SetProperty, name);
         }
+        else if (Match(TokenType.LeftParen))
+        {
+            var argCount = ArgumentList();
+            EmitBytes(OpCode.Invoke, name);
+            EmitByte(argCount);
+        }
         else
         {
             EmitBytes(OpCode.GetProperty, name);
@@ -872,6 +872,17 @@ public class CompilerSystem
         {
             EmitBytes(getOp, (byte)arg);
         }
+    }
+
+    private void This(bool canAssign)
+    {
+        if (_currentClass is null)
+        {
+            _parser!.Error("Can't use 'this' outside of a class.");
+            return;
+        }
+
+        Variable(false);
     }
 
     private void And(bool canAssign)

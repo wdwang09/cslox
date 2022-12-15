@@ -1,0 +1,106 @@
+﻿class Person {
+  sayName() {
+    print this.name;
+  }
+}
+
+var jane = Person();
+jane.name = "Jane";
+
+var method = jane.sayName;
+method();
+
+// =====
+
+class Brunch {
+  eggs() {}
+}
+
+var brunch = Brunch();
+var eggs = brunch.eggs;
+
+// =====
+
+class Scone {
+  topping(first, second) {
+    print "scone with " + first + " and " + second;
+  }
+}
+
+var scone = Scone();
+scone.topping("berries", "cream");
+
+// =====
+
+class Nested {
+  method() {
+    fun function() {
+      print this;
+    }
+
+    function();
+  }
+}
+
+Nested().method();
+
+// =====
+
+class Brunch {
+  init(food, drink) {}
+}
+
+Brunch("eggs", "coffee");
+
+// =====
+
+class CoffeeMaker {
+  init(coffee) {
+    this.coffee = coffee;
+  }
+
+  brew() {
+    print "Enjoy your cup of " + this.coffee;
+
+    // No reusing the grounds!
+    this.coffee = nil;
+  }
+}
+
+var maker = CoffeeMaker("coffee and chicory");
+maker.brew();
+
+// =====
+
+class Oops {
+  init() {
+    fun f() {
+      print "not a method";
+    }
+
+    this.field = f;
+  }
+}
+
+var oops = Oops();
+oops.field();
+
+// =====
+
+class Foo {
+  init() {
+    print this;
+  }
+}
+var foo = Foo();
+foo.init();
+
+// =====
+
+class Foo2 {
+  init() {
+    return;
+  }
+}
+var foo2 = Foo2();
+print foo2;

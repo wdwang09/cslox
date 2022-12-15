@@ -1,0 +1,4 @@
+fun notAMethod() {
+    print this;
+}
+notAMethod();

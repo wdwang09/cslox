@@ -2,6 +2,7 @@
 
 internal enum ObjType
 {
+    BoundMethod,
     Class,
     Closure,
     Function,
@@ -80,6 +81,8 @@ internal class ObjUpvalue : Obj
 internal class ObjClass : Obj
 {
     internal string Name { get; }
+    internal readonly Dictionary<string, Value> Methods = new();
+    internal const string InitString = "init";
 
     internal ObjClass(string name) : base(ObjType.Class)
     {
@@ -94,17 +97,34 @@ internal class ObjClass : Obj
 
 internal class ObjInstance : Obj
 {
-    private readonly ObjClass _class;
+    internal ObjClass Class { get; }
     internal readonly Dictionary<string, Value> Fields = new();
 
     internal ObjInstance(ObjClass @class) : base(ObjType.Instance)
     {
-        _class = @class;
+        Class = @class;
     }
 
     public override string ToString()
     {
-        return $"<instance of {_class.Name}>";
+        return $"<instance of {Class.Name}>";
+    }
+}
+
+internal class ObjBoundMethod : Obj
+{
+    internal Value Receiver;
+    internal ObjClosure Method;
+
+    internal ObjBoundMethod(Value receiver, ObjClosure method) : base(ObjType.BoundMethod)
+    {
+        Receiver = receiver;
+        Method = method;
+    }
+
+    public override string ToString()
+    {
+        return Method.Function.ToString();
     }
 }
 

@@ -30,10 +30,12 @@ internal enum OpCode : byte
     JumpIfFalse,
     Loop,
     Call,
+    Invoke,
     Closure,
     CloseUpvalue,
     Return,
-    Class
+    Class,
+    Method
 }
 
 public class Chunk
@@ -129,6 +131,8 @@ public class Chunk
                 return JumpInstruction("OP_LOOP", false, offset);
             case OpCode.Call:
                 return ByteInstruction("OP_CALL", offset);
+            case OpCode.Invoke:
+                return InvokeInstruction("OP_INVOKE", offset);
             case OpCode.Closure:
             {
                 offset++;
@@ -154,6 +158,8 @@ public class Chunk
                 return SimpleInstruction("OP_RETURN", offset);
             case OpCode.Class:
                 return ConstantInstruction("OP_CLASS", offset);
+            case OpCode.Method:
+                return ConstantInstruction("OP_METHOD", offset);
             default:
                 Console.Error.WriteLine($"Unknown opcode {instruction}.");
                 return offset + 1;
@@ -173,6 +179,16 @@ public class Chunk
         _constants.PrintValueWithIdx(constant);
         Console.WriteLine("}");
         return offset + 2;
+    }
+
+    private int InvokeInstruction(string name, int offset)
+    {
+        var constant = _code[offset + 1];
+        var argCount = _code[offset + 2];
+        Console.Write($"{name,-16} ({argCount} args) {constant,4} {{");
+        _constants.PrintValueWithIdx(constant);
+        Console.WriteLine("}");
+        return offset + 3;
     }
 
     private int ByteInstruction(string name, int offset)

@@ -190,8 +190,12 @@ internal class Vm
                         break;
                     }
 
-                    RuntimeError($"Undefined property '{name}'.");
-                    return InterpretResult.RuntimeError;
+                    if (!BindMethod(instance.Class, name))
+                    {
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    break;
                 }
                 case OpCode.SetProperty:
                 {
@@ -275,6 +279,18 @@ internal class Vm
                     frame = ref _frames[_frameCount - 1];
                     break;
                 }
+                case OpCode.Invoke:
+                {
+                    var method = frame.ReadString();
+                    var argCount = frame.ReadByte();
+                    if (!Invoke(method, argCount))
+                    {
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    frame = ref _frames[_frameCount - 1];
+                    break;
+                }
                 case OpCode.Closure:
                 {
                     var function = (ObjFunction)frame.ReadConstant().Obj;
@@ -320,6 +336,9 @@ internal class Vm
                 }
                 case OpCode.Class:
                     Push(new Value(new ObjClass(frame.ReadString())));
+                    break;
+                case OpCode.Method:
+                    DefineMethod(frame.ReadString());
                     break;
                 default:
                     Console.Error.WriteLine($"Unknown opcode {instruction}.");
@@ -395,9 +414,29 @@ internal class Vm
         {
             switch (callee.Obj.Type)
             {
+                case ObjType.BoundMethod:
+                {
+                    var bound = (ObjBoundMethod)callee.Obj;
+                    _stack[_stackTop - argCount - 1] = bound.Receiver;
+                    return Call(bound.Method, argCount);
+                }
                 case ObjType.Class:
-                    _stack[_stackTop - argCount - 1] = new Value(new ObjInstance((ObjClass)callee.Obj));
+                {
+                    var objClass = (ObjClass)callee.Obj;
+                    _stack[_stackTop - argCount - 1] = new Value(new ObjInstance(objClass));
+                    if (objClass.Methods.ContainsKey(ObjClass.InitString))
+                    {
+                        var initializer = objClass.Methods[ObjClass.InitString];
+                        return Call((ObjClosure)initializer.Obj, argCount);
+                    }
+                    else if (argCount != 0)
+                    {
+                        RuntimeError($"Expected 0 arguments but got {argCount}.");
+                        return false;
+                    }
+
                     return true;
+                }
                 case ObjType.Closure:
                     return Call((ObjClosure)callee.Obj, argCount);
                 case ObjType.Native:
@@ -422,6 +461,53 @@ internal class Vm
 
         RuntimeError("Can only call functions and classes.");
         return false;
+    }
+
+    private bool Invoke(string name, int argCount)
+    {
+        var receiver = Peek(argCount);
+
+        if (!receiver.IsObjType(ObjType.Instance))
+        {
+            RuntimeError("Only instances have methods.");
+            return false;
+        }
+
+        var instance = (ObjInstance)receiver.Obj;
+
+        if (instance.Fields.TryGetValue(name, out var value))
+        {
+            _stack[_stackTop - argCount - 1] = value;
+            return CallValue(value, argCount);
+        }
+
+        return InvokeFromClass(instance.Class, name, argCount);
+    }
+
+    private bool InvokeFromClass(ObjClass @class, string name, int argCount)
+    {
+        if (!@class.Methods.ContainsKey(name))
+        {
+            RuntimeError($"Undefined property '{name}'.");
+            return false;
+        }
+
+        return Call((ObjClosure)@class.Methods[name].Obj, argCount);
+    }
+
+    private bool BindMethod(ObjClass @class, string name)
+    {
+        if (!@class.Methods.ContainsKey(name))
+        {
+            RuntimeError($"Undefined property '{name}'.");
+            return false;
+        }
+
+        var method = @class.Methods[name];
+        var bound = new ObjBoundMethod(Peek(0), (ObjClosure)method.Obj);
+        Pop();
+        Push(new Value(bound));
+        return true;
     }
 
     private bool Call(ObjClosure closure, int argCount)
@@ -483,6 +569,14 @@ internal class Vm
             _openUpvalues.LocationIndex = -1;
             _openUpvalues = _openUpvalues.Next;
         }
+    }
+
+    private void DefineMethod(string name)
+    {
+        var method = Peek(0);
+        var objClass = (ObjClass)Peek(1).Obj;
+        objClass.Methods[name] = method;
+        Pop();
     }
 
     private void RuntimeError(params string[] messages)
