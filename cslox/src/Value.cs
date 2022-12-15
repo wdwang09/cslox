@@ -41,12 +41,12 @@ internal readonly struct Value
         _obj = obj;
     }
 
-    internal bool IsBool()
+    private bool IsBool()
     {
         return _type == ValueType.Bool;
     }
 
-    internal bool IsNil()
+    private bool IsNil()
     {
         return _type == ValueType.Nil;
     }
@@ -66,10 +66,10 @@ internal readonly struct Value
         return _type == ValueType.Obj;
     }
 
-    private bool IsObjType(ObjType objType)
-    {
-        return IsObj() && Obj.Type == objType;
-    }
+    // private bool IsObjType(ObjType objType)
+    // {
+    //     return IsObj() && Obj.Type == objType;
+    // }
 
     internal bool IsFalsey()
     {
@@ -99,7 +99,7 @@ internal readonly struct Value
             Console.Write(Number);
         else if (IsString())
             Console.Write("\"" + String + "\"");
-        else if (IsObjType(ObjType.Function))
+        else if (IsObj())
             Console.Write(Obj.ToString());
         else
         {
@@ -108,7 +108,7 @@ internal readonly struct Value
     }
 
     private readonly ValueType _type;
-    internal bool Boolean { get; } = false;
+    private bool Boolean { get; } = false;
     internal double Number { get; } = 0;
     internal string String { get; } = "";
 

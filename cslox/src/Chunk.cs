@@ -12,6 +12,8 @@ internal enum OpCode : byte
     GetGlobal,
     DefineGlobal,
     SetGlobal,
+    GetUpvalue,
+    SetUpvalue,
     Equal,
     Greater,
     Less,
@@ -26,6 +28,8 @@ internal enum OpCode : byte
     JumpIfFalse,
     Loop,
     Call,
+    Closure,
+    CloseUpvalue,
     Return
 }
 
@@ -86,6 +90,10 @@ public class Chunk
                 return ConstantInstruction("OP_DEFINE_GLOBAL", offset);
             case OpCode.SetGlobal:
                 return ConstantInstruction("OP_SET_GLOBAL", offset);
+            case OpCode.GetUpvalue:
+                return ByteInstruction("OP_GET_UPVALUE", offset);
+            case OpCode.SetUpvalue:
+                return ByteInstruction("OP_SET_UPVALUE", offset);
             case OpCode.Equal:
                 return SimpleInstruction("OP_EQUAL", offset);
             case OpCode.Greater:
@@ -114,6 +122,27 @@ public class Chunk
                 return JumpInstruction("OP_LOOP", false, offset);
             case OpCode.Call:
                 return ByteInstruction("OP_CALL", offset);
+            case OpCode.Closure:
+            {
+                offset++;
+                var constant = _code[offset++];
+                Console.Write($"{"OP_CLOSURE",-16} {constant,4} ");
+                _constants.ReadConstant(constant).Print();
+                Console.WriteLine();
+
+                var function = (ObjFunction)_constants.ReadConstant(constant).Obj;
+                for (var j = 0; j < function.UpvalueCount; ++j)
+                {
+                    var isLocal = _code[offset++] != 0;
+                    var index = _code[offset++];
+                    Console.WriteLine($"{offset - 2:0000}    |                     " +
+                                      $"{(isLocal ? "local" : "upvalue")} {index}");
+                }
+
+                return offset;
+            }
+            case OpCode.CloseUpvalue:
+                return SimpleInstruction("OP_CLOSE_UPVALUE", offset);
             case OpCode.Return:
                 return SimpleInstruction("OP_RETURN", offset);
             default:

@@ -2,24 +2,24 @@
 
 internal struct CallFrame
 {
-    internal ObjFunction Function;
+    internal ObjClosure Closure;
     internal int Ip;
     internal int Slots;
 
     internal byte ReadByte()
     {
-        return Function.Chunk.ReadByte(Ip++);
+        return Closure.Function.Chunk.ReadByte(Ip++);
     }
 
     internal Value ReadConstant()
     {
-        return Function.Chunk.ReadConstant(ReadByte());
+        return Closure.Function.Chunk.ReadConstant(ReadByte());
     }
 
     internal ushort ReadShort()
     {
         Ip += 2;
-        var readByte = Function.Chunk.ReadByte;
+        var readByte = Closure.Function.Chunk.ReadByte;
         return (ushort)((readByte(Ip - 2) << 8) | readByte(Ip - 1));
     }
 
@@ -45,6 +45,7 @@ internal class Vm
     private readonly Value[] _stack = new Value[StackMax];
     private int _stackTop;
     private readonly Dictionary<string, Value> _globals = new();
+    private ObjUpvalue? _openUpvalues;
 
     internal Vm()
     {
@@ -54,7 +55,10 @@ internal class Vm
     public InterpretResult Interpret(ObjFunction function)
     {
         Push(new Value(function));
-        Call(function, 0);
+        var closure = new ObjClosure(function);
+        Pop();
+        Push(new Value(closure));
+        Call(closure, 0);
         return Run();
     }
 
@@ -79,7 +83,7 @@ internal class Vm
             }
 
             Console.WriteLine();
-            frame.Function.Chunk.DisassembleInstruction(frame.Ip);
+            frame.Closure.Function.Chunk.DisassembleInstruction(frame.Ip);
 #endif
             var instruction = frame.ReadByte();
             switch ((OpCode)instruction)
@@ -143,6 +147,28 @@ internal class Vm
                     }
 
                     _globals[name] = Peek(0);
+                    break;
+                }
+                case OpCode.GetUpvalue:
+                {
+                    var slot = frame.ReadByte();
+                    var idx = frame.Closure.Upvalues[slot].LocationIndex;
+                    Push(idx >= 0 ? _stack[idx] : frame.Closure.Upvalues[slot].Closed);
+                    break;
+                }
+                case OpCode.SetUpvalue:
+                {
+                    var slot = frame.ReadByte();
+                    var idx = frame.Closure.Upvalues[slot].LocationIndex;
+                    if (idx >= 0)
+                    {
+                        _stack[idx] = Peek(0);
+                    }
+                    else
+                    {
+                        frame.Closure.Upvalues[slot].Closed = Peek(0);
+                    }
+
                     break;
                 }
                 case OpCode.Equal:
@@ -212,9 +238,37 @@ internal class Vm
                     frame = ref _frames[_frameCount - 1];
                     break;
                 }
+                case OpCode.Closure:
+                {
+                    var function = (ObjFunction)frame.ReadConstant().Obj;
+                    var closure = new ObjClosure(function);
+                    Push(new Value(closure));
+                    for (var i = 0; i < closure.UpvalueCount; ++i)
+                    {
+                        var isLocal = frame.ReadByte();
+                        var index = frame.ReadByte();
+                        if (isLocal > 0)
+                        {
+                            closure.Upvalues[i] = CaptureUpvalue(frame.Slots + index);
+                        }
+                        else
+                        {
+                            closure.Upvalues[i] = frame.Closure.Upvalues[index];
+                        }
+                    }
+
+                    break;
+                }
+                case OpCode.CloseUpvalue:
+                {
+                    CloseUpvalues(_stackTop - 1);
+                    Pop();
+                    break;
+                }
                 case OpCode.Return:
                 {
                     var result = Pop();
+                    CloseUpvalues(frame.Slots);
                     _frameCount--;
                     if (_frameCount == 0)
                     {
@@ -301,8 +355,8 @@ internal class Vm
         {
             switch (callee.Obj.Type)
             {
-                case ObjType.Function:
-                    return Call((ObjFunction)callee.Obj, argCount);
+                case ObjType.Closure:
+                    return Call((ObjClosure)callee.Obj, argCount);
                 case ObjType.Native:
                 {
                     var native = ((ObjNative)callee.Obj).Function;
@@ -327,11 +381,12 @@ internal class Vm
         return false;
     }
 
-    private bool Call(ObjFunction function, int argCount)
+    private bool Call(ObjClosure closure, int argCount)
     {
-        if (argCount != function.Arity)
+        if (argCount != closure.Function.Arity)
         {
-            RuntimeError($"Expected {function.Arity} arguments but got {argCount}.");
+            RuntimeError($"Expected {closure.Function.Arity} arguments " +
+                         $"but got {argCount}.");
             return false;
         }
 
@@ -342,10 +397,49 @@ internal class Vm
         }
 
         ref var frame = ref _frames[_frameCount++];
-        frame.Function = function;
+        frame.Closure = closure;
         frame.Ip = 0;
         frame.Slots = _stackTop - argCount - 1;
         return true;
+    }
+
+    private ObjUpvalue CaptureUpvalue(int local)
+    {
+        ObjUpvalue? prevUpvalue = null;
+        var upvalue = _openUpvalues;
+
+        while (upvalue is not null && upvalue.LocationIndex > local)
+        {
+            prevUpvalue = upvalue;
+            upvalue = upvalue.Next;
+        }
+
+        if (upvalue is not null && upvalue.LocationIndex == local)
+        {
+            return upvalue;
+        }
+
+        var createdUpvalue = new ObjUpvalue(local, upvalue);
+        if (prevUpvalue is null)
+        {
+            _openUpvalues = createdUpvalue;
+        }
+        else
+        {
+            prevUpvalue.Next = createdUpvalue;
+        }
+
+        return createdUpvalue;
+    }
+
+    private void CloseUpvalues(int last)
+    {
+        while (_openUpvalues is not null && _openUpvalues.LocationIndex >= last)
+        {
+            _openUpvalues.Closed = _stack[_openUpvalues.LocationIndex];
+            _openUpvalues.LocationIndex = -1;
+            _openUpvalues = _openUpvalues.Next;
+        }
     }
 
     private void RuntimeError(params string[] messages)
@@ -355,10 +449,10 @@ internal class Vm
         for (var i = _frameCount - 1; i >= 0; i--)
         {
             ref var frame = ref _frames[i];
-            ref var function = ref frame.Function;
             var instruction = frame.Ip - 1;
-            Console.Error.Write($"[Line {function.Chunk.GetLineNumber(instruction)}] in ");
-            Console.Error.WriteLine(function.Name == "" ? "script" : $"{function.Name}()");
+            Console.Error.Write($"[Line {frame.Closure.Function.Chunk.GetLineNumber(instruction)}] in ");
+            var output = frame.Closure.Function.Name == "" ? "script" : frame.Closure.Function.Name;
+            Console.Error.WriteLine(output);
         }
 
         ResetStack();

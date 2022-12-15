@@ -2,7 +2,7 @@
 
 public class CsLox
 {
-    private readonly LoxCompiler _loxCompiler = new();
+    private readonly CompilerSystem _compilerSystem = new();
 
     public void Repl()
     {
@@ -36,6 +36,6 @@ public class CsLox
 
     private InterpretResult Interpret(string source)
     {
-        return _loxCompiler.CompileAndRun(source);
+        return _compilerSystem.CompileAndRun(source);
     }
 }

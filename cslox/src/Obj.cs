@@ -2,11 +2,13 @@
 
 internal enum ObjType
 {
+    Closure,
     Function,
     Native,
+    Upvalue
 }
 
-internal class Obj
+internal abstract class Obj
 {
     protected Obj(ObjType objType)
     {
@@ -21,6 +23,7 @@ internal class ObjFunction : Obj
     internal Chunk Chunk { get; }
     internal string Name { get; }
     internal int Arity = 0;
+    internal int UpvalueCount = 0;
 
     internal ObjFunction(string functionName) : base(ObjType.Function)
     {
@@ -31,6 +34,44 @@ internal class ObjFunction : Obj
     public override string ToString()
     {
         return Name.Length == 0 ? "<script>" : $"<fn {Name}>";
+    }
+}
+
+internal class ObjClosure : Obj
+{
+    internal ObjFunction Function { get; }
+
+    internal readonly ObjUpvalue[] Upvalues;
+    internal int UpvalueCount { get; }
+
+    internal ObjClosure(ObjFunction function) : base(ObjType.Closure)
+    {
+        Function = function;
+        UpvalueCount = Function.UpvalueCount;
+        Upvalues = new ObjUpvalue[UpvalueCount];
+    }
+
+    public override string ToString()
+    {
+        return Function.ToString();
+    }
+}
+
+internal class ObjUpvalue : Obj
+{
+    internal int LocationIndex; // if -1 then Closed
+    internal Value Closed = new();
+    internal ObjUpvalue? Next;
+
+    internal ObjUpvalue(int slot, ObjUpvalue? next = null) : base(ObjType.Upvalue)
+    {
+        LocationIndex = slot;
+        Next = next;
+    }
+
+    public override string ToString()
+    {
+        return "upvalue";
     }
 }
 

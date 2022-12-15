@@ -1,0 +1,155 @@
+﻿var x = "global";
+fun outer() {
+  var x = "outer";
+  fun inner() {
+    print x;
+  }
+  inner();
+}
+outer();
+print "===";
+
+// =====
+
+fun makeClosure() {
+  var local = "local";
+  fun closure() {
+    print local;
+  }
+  return closure;
+}
+
+var closure = makeClosure();
+closure();
+print "===";
+
+// =====
+
+fun makeClosure(value) {
+  fun closure() {
+    print value;
+  }
+  return closure;
+}
+
+var doughnut = makeClosure("doughnut");
+var bagel = makeClosure("bagel");
+doughnut();
+bagel();
+print "===";
+
+// =====
+
+fun outer() {
+  var x = 1;    // (1)
+  x = 2;        // (2)
+  fun inner() { // (3)
+    print x;
+  }
+  inner();
+}
+
+outer();
+print "===";
+
+// =====
+
+{
+  var a = 3;
+  fun f() {
+    print a;
+  }
+  f();
+}
+print "===";
+
+// =====
+
+fun outer() {
+  var x = "value";
+  fun middle() {
+    fun inner() {
+      print x;
+    }
+
+    print "create inner closure";
+    return inner;
+  }
+
+  print "return from outer";
+  return middle;
+}
+
+var mid = outer();
+var in = mid();
+in();
+print "===";
+
+// =====
+
+fun outer() {
+  var a = 1;
+  var b = 2;
+  fun middle() {
+    var c = 3;
+    var d = 4;
+    fun inner() {
+      print a + c + b + d;
+    }
+    return inner;
+  }
+  return middle;
+}
+
+var m = outer();
+var i = m();
+i();
+print "===";
+
+// =====
+
+fun outer() {
+  var x = "before";
+  fun inner() {
+    x = "assigned";
+  }
+  inner();
+  print x;
+}
+outer();  // assigned
+print "===";
+
+// =====
+
+fun outer() {
+  var x = "outside";
+  fun inner() {
+    print x;
+  }
+
+  return inner;
+}
+
+var closure = outer();
+closure();
+print "===";
+
+// =====
+
+var globalSet;
+var globalGet;
+
+fun main() {
+  var a = "initial";
+
+  fun set() { a = "updated"; }
+  fun get() { print a; }
+
+  globalSet = set;
+  globalGet = get;
+}
+
+main();
+globalSet();
+globalGet();
+print "===";

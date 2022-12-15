@@ -10,6 +10,13 @@ internal struct Local
 {
     internal string Name;
     internal int Depth;
+    internal bool IsCaptured;
+}
+
+internal struct Upvalue
+{
+    internal byte Index;
+    internal bool IsLocal;
 }
 
 internal class SubCompiler
@@ -17,6 +24,8 @@ internal class SubCompiler
     internal const int LocalMax = 256;
     internal readonly Local[] Locals = new Local[LocalMax];
     internal int LocalCount;
+    internal const int UpvalueMax = 256;
+    internal readonly Upvalue[] Upvalues = new Upvalue[UpvalueMax];
     internal int ScopeDepth;
     internal readonly ObjFunction Function;
     internal readonly FunctionType Type;
@@ -39,7 +48,7 @@ internal class SubCompiler
     }
 }
 
-public class LoxCompiler
+public class CompilerSystem
 {
     private readonly Dictionary<TokenType, ParseRule> _rules;
     private readonly Vm _vm = new();
@@ -47,7 +56,7 @@ public class LoxCompiler
     private Parser? _parser;
     private SubCompiler? _current;
 
-    public LoxCompiler()
+    public CompilerSystem()
     {
         _rules = new Dictionary<TokenType, ParseRule>
         {
@@ -104,8 +113,7 @@ public class LoxCompiler
 #if DEBUG
         Console.WriteLine(line);
 #endif
-        if (function is null) return InterpretResult.CompileError;
-        return _vm.Interpret(function);
+        return function is null ? InterpretResult.CompileError : _vm.Interpret(function);
     }
 
     private ObjFunction? Compile(string source)
@@ -342,7 +350,8 @@ public class LoxCompiler
         while (_current!.LocalCount > 0 &&
                _current!.Locals[_current!.LocalCount - 1].Depth > _current!.ScopeDepth)
         {
-            EmitByte(OpCode.Pop);
+            var isCaptured = _current!.Locals[_current!.LocalCount - 1].IsCaptured;
+            EmitByte(isCaptured ? OpCode.CloseUpvalue : OpCode.Pop);
             _current!.LocalCount--;
         }
     }
@@ -449,6 +458,7 @@ public class LoxCompiler
         ref var local = ref _current!.Locals[_current!.LocalCount++];
         local.Name = name;
         local.Depth = -1;
+        local.IsCaptured = false;
     }
 
     private void DefineVariable(byte global)
@@ -476,7 +486,8 @@ public class LoxCompiler
             possibleFunctionName = _parser!.Previous!.Value.Lexeme;
         }
 
-        _current = new SubCompiler(_current, type, possibleFunctionName);
+        var subCompiler = new SubCompiler(_current, type, possibleFunctionName);
+        _current = subCompiler;
         BeginScope();
         Consume(TokenType.LeftParen, "Expect '(' after function name.");
         if (!Check(TokenType.RightParen))
@@ -498,7 +509,13 @@ public class LoxCompiler
         Consume(TokenType.LeftBrace, "Expect '{' before function body.");
         Block();
         var function = EndCompiler();
-        EmitBytes(OpCode.Constant, MakeConstant(new Value(function)));
+        EmitBytes(OpCode.Closure, MakeConstant(new Value(function)));
+
+        for (var i = 0; i < function.UpvalueCount; ++i)
+        {
+            EmitByte((byte)(subCompiler.Upvalues[i].IsLocal ? 1 : 0));
+            EmitByte(subCompiler.Upvalues[i].Index);
+        }
     }
 
     private int ResolveLocal(SubCompiler compiler, string name)
@@ -516,6 +533,48 @@ public class LoxCompiler
         }
 
         return -1;
+    }
+
+    private int ResolveUpvalue(SubCompiler compiler, string name)
+    {
+        if (compiler.Enclosing is null) return -1;
+        var local = ResolveLocal(compiler.Enclosing, name);
+        if (local != -1)
+        {
+            compiler.Enclosing.Locals[local].IsCaptured = true;
+            return AddUpvalue(compiler, (byte)local, true);
+        }
+
+        var upvalue = ResolveUpvalue(compiler.Enclosing, name);
+        if (upvalue != -1)
+        {
+            return AddUpvalue(compiler, (byte)upvalue, false);
+        }
+
+        return -1;
+    }
+
+    private int AddUpvalue(SubCompiler compiler, byte index, bool isLocal)
+    {
+        var upvalueCount = compiler.Function.UpvalueCount;
+        for (var i = 0; i < upvalueCount; ++i)
+        {
+            ref var upvalue = ref compiler.Upvalues[i];
+            if (upvalue.Index == index && upvalue.IsLocal == isLocal)
+            {
+                return i;
+            }
+        }
+
+        if (upvalueCount == SubCompiler.UpvalueMax)
+        {
+            _parser!.Error("Too many closure variables in function.");
+            return 0;
+        }
+
+        compiler.Upvalues[upvalueCount].IsLocal = isLocal;
+        compiler.Upvalues[upvalueCount].Index = index;
+        return compiler.Function.UpvalueCount++;
     }
 
     private byte IdentifierConstant(Token name)
@@ -753,13 +812,16 @@ public class LoxCompiler
     private void NamedVariable(Token name, bool canAssign)
     {
         OpCode getOp, setOp;
-        var argResolveLocal = ResolveLocal(_current!, name.Lexeme);
-        byte arg;
-        if (argResolveLocal != -1)
+        var arg = ResolveLocal(_current!, name.Lexeme);
+        if (arg != -1)
         {
             getOp = OpCode.GetLocal;
             setOp = OpCode.SetLocal;
-            arg = (byte)argResolveLocal;
+        }
+        else if ((arg = ResolveUpvalue(_current!, name.Lexeme)) != -1)
+        {
+            getOp = OpCode.GetUpvalue;
+            setOp = OpCode.SetUpvalue;
         }
         else
         {
@@ -771,11 +833,11 @@ public class LoxCompiler
         if (canAssign && Match(TokenType.Equal))
         {
             Expression();
-            EmitBytes(setOp, arg);
+            EmitBytes(setOp, (byte)arg);
         }
         else
         {
-            EmitBytes(getOp, arg);
+            EmitBytes(getOp, (byte)arg);
         }
     }
 
