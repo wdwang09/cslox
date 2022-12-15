@@ -2,8 +2,10 @@
 
 internal enum ObjType
 {
+    Class,
     Closure,
     Function,
+    Instance,
     Native,
     Upvalue
 }
@@ -72,6 +74,37 @@ internal class ObjUpvalue : Obj
     public override string ToString()
     {
         return "upvalue";
+    }
+}
+
+internal class ObjClass : Obj
+{
+    internal string Name { get; }
+
+    internal ObjClass(string name) : base(ObjType.Class)
+    {
+        Name = name;
+    }
+
+    public override string ToString()
+    {
+        return $"<class {Name}>";
+    }
+}
+
+internal class ObjInstance : Obj
+{
+    private readonly ObjClass _class;
+    internal readonly Dictionary<string, Value> Fields = new();
+
+    internal ObjInstance(ObjClass @class) : base(ObjType.Instance)
+    {
+        _class = @class;
+    }
+
+    public override string ToString()
+    {
+        return $"<instance of {_class.Name}>";
     }
 }
 

@@ -14,6 +14,8 @@ internal enum OpCode : byte
     SetGlobal,
     GetUpvalue,
     SetUpvalue,
+    GetProperty,
+    SetProperty,
     Equal,
     Greater,
     Less,
@@ -30,7 +32,8 @@ internal enum OpCode : byte
     Call,
     Closure,
     CloseUpvalue,
-    Return
+    Return,
+    Class
 }
 
 public class Chunk
@@ -94,6 +97,10 @@ public class Chunk
                 return ByteInstruction("OP_GET_UPVALUE", offset);
             case OpCode.SetUpvalue:
                 return ByteInstruction("OP_SET_UPVALUE", offset);
+            case OpCode.GetProperty:
+                return ConstantInstruction("OP_GET_PROPERTY", offset);
+            case OpCode.SetProperty:
+                return ConstantInstruction("OP_SET_PROPERTY", offset);
             case OpCode.Equal:
                 return SimpleInstruction("OP_EQUAL", offset);
             case OpCode.Greater:
@@ -145,6 +152,8 @@ public class Chunk
                 return SimpleInstruction("OP_CLOSE_UPVALUE", offset);
             case OpCode.Return:
                 return SimpleInstruction("OP_RETURN", offset);
+            case OpCode.Class:
+                return ConstantInstruction("OP_CLASS", offset);
             default:
                 Console.Error.WriteLine($"Unknown opcode {instruction}.");
                 return offset + 1;

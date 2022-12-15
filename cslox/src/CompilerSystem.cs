@@ -65,7 +65,7 @@ public class CompilerSystem
             [TokenType.LeftBrace] = new(null, null, Precedence.None),
             [TokenType.RightBrace] = new(null, null, Precedence.None),
             [TokenType.Comma] = new(null, null, Precedence.None),
-            [TokenType.Dot] = new(null, null, Precedence.None),
+            [TokenType.Dot] = new(null, Dot, Precedence.Call),
             [TokenType.Minus] = new(Unary, Binary, Precedence.Term),
             [TokenType.Plus] = new(null, Binary, Precedence.Term),
             [TokenType.Semicolon] = new(null, null, Precedence.None),
@@ -145,7 +145,11 @@ public class CompilerSystem
 
     private void Declaration()
     {
-        if (Match(TokenType.Fun))
+        if (Match(TokenType.Class))
+        {
+            ClassDeclaration();
+        }
+        else if (Match(TokenType.Fun))
         {
             FunDeclaration();
         }
@@ -162,6 +166,19 @@ public class CompilerSystem
         {
             Synchronize();
         }
+    }
+
+    private void ClassDeclaration()
+    {
+        Consume(TokenType.Identifier, "Expect class name.");
+        var nameConstant = IdentifierConstant(_parser!.Previous!.Value);
+        DeclareVariable();
+
+        EmitBytes(OpCode.Class, nameConstant);
+        DefineVariable(nameConstant);
+
+        Consume(TokenType.LeftBrace, "Expect '{' before class body.");
+        Consume(TokenType.RightBrace, "Expect '}' after class body.");
     }
 
     private void FunDeclaration()
@@ -757,6 +774,22 @@ public class CompilerSystem
     {
         var argCount = ArgumentList();
         EmitBytes(OpCode.Call, argCount);
+    }
+
+    private void Dot(bool canAssign)
+    {
+        Consume(TokenType.Identifier, "Expect property name after '.'.");
+        var name = IdentifierConstant(_parser!.Previous!.Value);
+
+        if (canAssign && Match(TokenType.Equal))
+        {
+            Expression();
+            EmitBytes(OpCode.SetProperty, name);
+        }
+        else
+        {
+            EmitBytes(OpCode.GetProperty, name);
+        }
     }
 
     private byte ArgumentList()

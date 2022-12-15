@@ -1,0 +1,2 @@
+﻿var obj = "not an instance";
+obj.field = 1;

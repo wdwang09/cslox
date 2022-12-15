@@ -171,6 +171,43 @@ internal class Vm
 
                     break;
                 }
+                case OpCode.GetProperty:
+                {
+                    if (!Peek(0).IsObjType(ObjType.Instance))
+                    {
+                        RuntimeError("Only instances have properties.");
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    var instance = (ObjInstance)Peek(0).Obj;
+                    var name = frame.ReadString();
+
+                    if (instance.Fields.ContainsKey(name))
+                    {
+                        var value = instance.Fields[name];
+                        Pop();
+                        Push(value);
+                        break;
+                    }
+
+                    RuntimeError($"Undefined property '{name}'.");
+                    return InterpretResult.RuntimeError;
+                }
+                case OpCode.SetProperty:
+                {
+                    if (!Peek(1).IsObjType(ObjType.Instance))
+                    {
+                        RuntimeError("Only instances have fields.");
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    var instance = (ObjInstance)Peek(1).Obj;
+                    instance.Fields[frame.ReadString()] = Peek(0);
+                    var value = Pop();
+                    Pop();
+                    Push(value);
+                    break;
+                }
                 case OpCode.Equal:
                 {
                     var b = Pop();
@@ -281,6 +318,9 @@ internal class Vm
                     frame = ref _frames[_frameCount - 1];
                     break;
                 }
+                case OpCode.Class:
+                    Push(new Value(new ObjClass(frame.ReadString())));
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown opcode {instruction}.");
                     return InterpretResult.CompileError;
@@ -355,6 +395,9 @@ internal class Vm
         {
             switch (callee.Obj.Type)
             {
+                case ObjType.Class:
+                    _stack[_stackTop - argCount - 1] = new Value(new ObjInstance((ObjClass)callee.Obj));
+                    return true;
                 case ObjType.Closure:
                     return Call((ObjClosure)callee.Obj, argCount);
                 case ObjType.Native:

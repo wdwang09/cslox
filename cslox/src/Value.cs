@@ -66,10 +66,10 @@ internal readonly struct Value
         return _type == ValueType.Obj;
     }
 
-    // private bool IsObjType(ObjType objType)
-    // {
-    //     return IsObj() && Obj.Type == objType;
-    // }
+    internal bool IsObjType(ObjType objType)
+    {
+        return IsObj() && Obj.Type == objType;
+    }
 
     internal bool IsFalsey()
     {
