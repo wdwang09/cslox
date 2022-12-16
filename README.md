@@ -17,3 +17,10 @@ dotnet run --configuration Release
 dotnet run code.lox
 dotnet run --configuration Release code.lox
 ```
+
+Test (for compilation error or runtime error):
+
+```
+# cd <solution directory>
+dotnet test
+```

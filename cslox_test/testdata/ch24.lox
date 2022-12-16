@@ -38,6 +38,6 @@ fun fib(n) {
     return fib(n - 2) + fib(n - 1);
 }
 var t1 = clock();
-print fib(30);
+print fib(10);
 var t2 = clock();
 print t2-t1;
