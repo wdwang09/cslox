@@ -48,7 +48,10 @@ internal enum TokenType
     While,
 
     Error,
-    Eof
+    Eof,
+
+    // Synthetic: this, super
+    Synthetic
 }
 
 internal readonly struct Token

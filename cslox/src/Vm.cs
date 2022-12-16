@@ -212,6 +212,18 @@ internal class Vm
                     Push(value);
                     break;
                 }
+                case OpCode.GetSuper:
+                {
+                    var name = frame.ReadString();
+                    var superclass = (ObjClass)Pop().Obj;
+
+                    if (!BindMethod(superclass, name))
+                    {
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    break;
+                }
                 case OpCode.Equal:
                 {
                     var b = Pop();
@@ -291,6 +303,19 @@ internal class Vm
                     frame = ref _frames[_frameCount - 1];
                     break;
                 }
+                case OpCode.SuperInvoke:
+                {
+                    var method = frame.ReadString();
+                    var argCount = frame.ReadByte();
+                    var superclass = (ObjClass)Pop().Obj;
+                    if (!InvokeFromClass(superclass, method, argCount))
+                    {
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    frame = ref _frames[_frameCount - 1];
+                    break;
+                }
                 case OpCode.Closure:
                 {
                     var function = (ObjFunction)frame.ReadConstant().Obj;
@@ -337,6 +362,24 @@ internal class Vm
                 case OpCode.Class:
                     Push(new Value(new ObjClass(frame.ReadString())));
                     break;
+                case OpCode.Inherit:
+                {
+                    var superclass = Peek(1);
+                    if (!superclass.IsObjType(ObjType.Class))
+                    {
+                        RuntimeError("Superclass must be a class.");
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    var subclass = (ObjClass)Peek(0).Obj;
+                    foreach (var method in ((ObjClass)superclass.Obj).Methods)
+                    {
+                        subclass.Methods.Add(method.Key, method.Value);
+                    }
+
+                    Pop();
+                    break;
+                }
                 case OpCode.Method:
                     DefineMethod(frame.ReadString());
                     break;

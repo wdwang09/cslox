@@ -46,7 +46,7 @@ public class CompilerSystem
             [TokenType.Or] = new(null, Or, Precedence.Or),
             [TokenType.Print] = new(null, null, Precedence.None),
             [TokenType.Return] = new(null, null, Precedence.None),
-            [TokenType.Super] = new(null, null, Precedence.None),
+            [TokenType.Super] = new(Super, null, Precedence.None),
             [TokenType.This] = new(This, null, Precedence.None),
             [TokenType.True] = new(Literal, null, Precedence.None),
             [TokenType.Var] = new(null, null, Precedence.None),
@@ -134,6 +134,25 @@ public class CompilerSystem
         var classCompiler = new ClassCompiler(_currentClass);
         _currentClass = classCompiler;
 
+        if (Match(TokenType.Less))
+        {
+            Consume(TokenType.Identifier, "Expect superclass name.");
+            Variable(false);
+
+            if (className.Lexeme == _parser!.Previous!.Value.Lexeme)
+            {
+                _parser!.Error("A class can't inherit from itself.");
+            }
+
+            BeginScope();
+            AddLocal("super");
+            DefineVariable(0);
+
+            NamedVariable(className, false);
+            EmitByte(OpCode.Inherit);
+            classCompiler.HasSuperclass = true;
+        }
+
         NamedVariable(className, false);
         Consume(TokenType.LeftBrace, "Expect '{' before class body.");
         while (!Check(TokenType.RightBrace) && !Check(TokenType.Eof))
@@ -143,6 +162,11 @@ public class CompilerSystem
 
         Consume(TokenType.RightBrace, "Expect '}' after class body.");
         EmitByte(OpCode.Pop);
+
+        if (classCompiler.HasSuperclass)
+        {
+            EndScope();
+        }
 
         _currentClass = _currentClass.Enclosing;
     }
@@ -883,6 +907,36 @@ public class CompilerSystem
         }
 
         Variable(false);
+    }
+
+    private void Super(bool canAssign)
+    {
+        if (_currentClass is null)
+        {
+            _parser!.Error("Can't use 'super' outside of a class.");
+        }
+        else if (!_currentClass.HasSuperclass)
+        {
+            _parser!.Error("Can't use 'super' in a class with no superclass.");
+        }
+
+        Consume(TokenType.Dot, "Expect '.' after 'super'.");
+        Consume(TokenType.Identifier, "Expect superclass method name.");
+        var name = IdentifierConstant(_parser!.Previous!.Value);
+
+        NamedVariable(new Token(TokenType.Synthetic, "this", 0), false);
+        if (Match(TokenType.LeftParen))
+        {
+            var argCount = ArgumentList();
+            NamedVariable(new Token(TokenType.Synthetic, "super", 0), false);
+            EmitBytes(OpCode.SuperInvoke, name);
+            EmitByte(argCount);
+        }
+        else
+        {
+            NamedVariable(new Token(TokenType.Synthetic, "super", 0), false);
+            EmitBytes(OpCode.GetSuper, name);
+        }
     }
 
     private void And(bool canAssign)

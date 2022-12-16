@@ -16,6 +16,7 @@ internal enum OpCode : byte
     SetUpvalue,
     GetProperty,
     SetProperty,
+    GetSuper,
     Equal,
     Greater,
     Less,
@@ -31,10 +32,12 @@ internal enum OpCode : byte
     Loop,
     Call,
     Invoke,
+    SuperInvoke,
     Closure,
     CloseUpvalue,
     Return,
     Class,
+    Inherit,
     Method
 }
 
@@ -103,6 +106,8 @@ public class Chunk
                 return ConstantInstruction("OP_GET_PROPERTY", offset);
             case OpCode.SetProperty:
                 return ConstantInstruction("OP_SET_PROPERTY", offset);
+            case OpCode.GetSuper:
+                return ConstantInstruction("OP_GET_SUPER", offset);
             case OpCode.Equal:
                 return SimpleInstruction("OP_EQUAL", offset);
             case OpCode.Greater:
@@ -133,6 +138,8 @@ public class Chunk
                 return ByteInstruction("OP_CALL", offset);
             case OpCode.Invoke:
                 return InvokeInstruction("OP_INVOKE", offset);
+            case OpCode.SuperInvoke:
+                return InvokeInstruction("OP_SUPER_INVOKE", offset);
             case OpCode.Closure:
             {
                 offset++;
@@ -158,6 +165,8 @@ public class Chunk
                 return SimpleInstruction("OP_RETURN", offset);
             case OpCode.Class:
                 return ConstantInstruction("OP_CLASS", offset);
+            case OpCode.Inherit:
+                return SimpleInstruction("OP_INHERIT", offset);
             case OpCode.Method:
                 return ConstantInstruction("OP_METHOD", offset);
             default:

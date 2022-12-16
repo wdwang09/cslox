@@ -54,9 +54,11 @@ internal class SubCompiler
 internal class ClassCompiler
 {
     internal readonly ClassCompiler? Enclosing;
+    internal bool HasSuperclass;
 
     internal ClassCompiler(ClassCompiler? compiler)
     {
         Enclosing = compiler;
+        HasSuperclass = false;
     }
 }

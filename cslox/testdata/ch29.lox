@@ -1,0 +1,73 @@
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+  }
+}
+class BostonCreamSimple < Doughnut {}
+class BostonCream < Doughnut {
+  cook() {
+    super.cook();
+    print "Pipe full of custard and coat with chocolate.";
+  }
+}
+BostonCreamSimple().cook();
+BostonCream().cook();
+
+// =====
+
+class A {
+  method() {
+    print "A method";
+  }
+}
+class B < A {
+  method() {
+    print "B method";
+  }
+  test() {
+    super.method();
+  }
+}
+class C < B {}
+C().test();
+
+// =====
+
+class A {
+  method() {
+    print "A";
+  }
+}
+
+class B < A {
+  method() {
+    var closure = super.method;
+    closure(); // Prints "A".
+  }
+}
+
+B().method();
+var c = B().method;
+c();
+
+// =====
+
+class Doughnut {
+  cook() {
+    print "Dunk in the fryer.";
+    this.finish("sprinkles");
+  }
+
+  finish(ingredient) {
+    print "Finish with " + ingredient;
+  }
+}
+
+class Cruller < Doughnut {
+  finish(ingredient) {
+    // No sprinkles, always icing.
+    super.finish("icing");
+  }
+}
+
+Cruller().cook();
