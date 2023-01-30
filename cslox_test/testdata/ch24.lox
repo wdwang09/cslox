@@ -2,30 +2,35 @@ fun sum(a, b, c) {
   return a + b + c;
 }
 
-print 1 + sum(2, 3, 4);
+assert 1 + sum(2, 3, 4) == 10;
 
 // =====
 
+var res = 0;
 fun count(m, n) {
-    if (m > n) count(m - 1, m);
+    if (m > n) count(m - 1, n);
     print m;
+    res = res + m;
 }
 count(3, 0);
+assert res == 6;
 
 // =====
 
 fun sayHi(first, last) {
-    print "Hi, " + first + " " + last + "!";
+    return "Hi, " + first + " " + last + "!";
 }
-sayHi("Dear", "Reader");
-print sayHi("A", "B");
+assert sayHi("Dear", "Reader") == "Hi, Dear Reader!";
+
+fun null(first, last) {}
+assert null("A", "B") == nil;
 
 // =====
 
 fun f() {
     return "f()";
 }
-print f();
+assert f() == "f()";
 
 // =====
 
@@ -38,6 +43,7 @@ fun fib(n) {
     return fib(n - 2) + fib(n - 1);
 }
 var t1 = clock();
-print fib(10);
+var f_ans = fib(10);
+assert f_ans == 55;
 var t2 = clock();
 print t2-t1;

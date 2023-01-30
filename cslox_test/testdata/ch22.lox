@@ -14,10 +14,14 @@ var a_nil;
 print a_nil; // "nil".
 
 var a_assignment = "before";
+assert a_assignment == "before";
 a_assignment = "value";
+assert a_assignment == "value";
 a_assignment = 1;
+assert a_assignment == 1;
 var b_assignment = "after";
 a_assignment = b_assignment = 2;
+assert (a_assignment == b_assignment) and (a_assignment == 2) and (b_assignment == 2);
 
 {
     var a = "global a";
@@ -28,15 +32,15 @@ a_assignment = b_assignment = 2;
         var b = "outer b";
         {
             var a = "inner a";
-            print a;
-            print b;
-            print c;
+            assert a == "inner a";
+            assert b == "outer b";
+            assert c == "global c";
         }
-        print a;
-        print b;
-        print c;
+        assert a == "outer a";
+        assert b == "outer b";
+        assert c == "global c";
     }
-    print a;
-    print b;
-    print c;
+    assert a == "global a";
+    assert b == "global b";
+    assert c == "global c";
 }

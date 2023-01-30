@@ -41,7 +41,7 @@ internal readonly struct Value
         _obj = obj;
     }
 
-    private bool IsBool()
+    internal bool IsBool()
     {
         return _type == ValueType.Bool;
     }
@@ -74,6 +74,11 @@ internal readonly struct Value
     internal bool IsFalsey()
     {
         return IsNil() || (IsBool() && !Boolean);
+    }
+
+    internal bool IsTrue()
+    {
+        return IsBool() && Boolean;
     }
 
     internal bool Equal(Value b)

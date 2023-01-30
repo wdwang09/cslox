@@ -49,6 +49,8 @@ internal enum TokenType
 
     Error,
     Eof,
+    
+    Assert,
 
     // Synthetic: this, super
     Synthetic
@@ -223,7 +225,16 @@ public class Scanner
     {
         switch (_source[_start])
         {
-            case 'a': return CheckKeyWord(1, 2, "and", TokenType.And);
+            case 'a': 
+                if (_current - _start > 1)
+                    switch (_source[_start + 1])
+                    {
+                        case 'n':
+                            return CheckKeyWord(2, 1, "and", TokenType.And);
+                        case 's':
+                            return CheckKeyWord(2, 4, "assert", TokenType.Assert);
+                    }
+                break;
             case 'c': return CheckKeyWord(1, 4, "class", TokenType.Class);
             case 'e': return CheckKeyWord(1, 3, "else", TokenType.Else);
             case 'f':

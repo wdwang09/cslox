@@ -258,6 +258,23 @@ internal class Vm
                     Pop().Print();
                     Console.WriteLine();
                     break;
+                case OpCode.Assert:
+                {
+                    var expr = Pop();
+                    if (expr.IsBool())
+                    {
+                        if (expr.IsTrue())
+                        {
+                            break;
+                        }
+
+                        RuntimeError("Assertion with False.");
+                        return InterpretResult.RuntimeError;
+                    }
+
+                    RuntimeError("Currently assertion only supports boolean expression.");
+                    return InterpretResult.RuntimeError;
+                }
                 case OpCode.Jump:
                 {
                     var offset = frame.ReadShort();

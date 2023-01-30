@@ -45,6 +45,7 @@ public class CompilerSystem
             [TokenType.Nil] = new(Literal, null, Precedence.None),
             [TokenType.Or] = new(null, Or, Precedence.Or),
             [TokenType.Print] = new(null, null, Precedence.None),
+            [TokenType.Assert] = new(null, null, Precedence.None),
             [TokenType.Return] = new(null, null, Precedence.None),
             [TokenType.Super] = new(Super, null, Precedence.None),
             [TokenType.This] = new(This, null, Precedence.None),
@@ -202,6 +203,10 @@ public class CompilerSystem
         {
             PrintStatement();
         }
+        else if (Match(TokenType.Assert))
+        {
+            AssertStatement();
+        }
         else if (Match(TokenType.If))
         {
             IfStatement();
@@ -235,6 +240,13 @@ public class CompilerSystem
         Expression();
         Consume(TokenType.Semicolon, "Expect ';' after value.");
         EmitByte(OpCode.Print);
+    }
+
+    private void AssertStatement()
+    {
+        Expression();
+        Consume(TokenType.Semicolon, "Expect ';' after value.");
+        EmitByte(OpCode.Assert);
     }
 
     private void IfStatement()
@@ -972,6 +984,7 @@ public class CompilerSystem
                 case TokenType.If:
                 case TokenType.While:
                 case TokenType.Print:
+                case TokenType.Assert:
                 case TokenType.Return:
                     return;
             }

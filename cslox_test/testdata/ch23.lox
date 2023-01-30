@@ -1,60 +1,78 @@
 var a=5;
+var res;
 
 if (a > 2) {
-    print "then";
+    res = "then";
 }
+assert res == "then";
 
 if (a > 10) {
-    print "then";
+    res = "then";
 } else {
-    print "else";
+    res = "else";
 }
+assert res == "else";
 
 if (a > 2) {
-    print "then";
+    res = "then";
 } else {
-    print "else";
+    res = "else";
 }
+assert res == "then";
 
 if (a > 5) {
-    print "then";
+    res = "then";
 }
 else if (a > 2) {
-    print "else if";
+    res = "else if";
 }
 else {
-    print "else";
+    res = "else";
 }
+assert res == "else if";
 
 if (a > 10) {
-    print "then";
+    res = "then";
 }
 else if (a > 7) {
-    print "else if";
+    res = "else if";
 }
 else {
-    print "else";
+    res = "else";
 }
+assert res == "else";
 
 // =====
 
 a = 3;
+res = 6;
 while (a >= 1) {
     print a;
+    res = res - a;
     a = a - 1;
 }
+assert (res == 0) and (a == 0);
 
 // =====
 
+res = 0;
 for (var b=0; b < 3; b=b+1) {
+    res = res + 1;
     print b;
 }
+assert (res == 3);
 
+res = 0;
 for (var b=0; b > 3; b=b+1) {
+    res = res + 1;
     print b;
 }
+assert (res == 0);
 
 a = 3;
+res = 0;
 for (; a >= 0; a=a-1) {
+    res = res + 1;
     print a;
 }
+assert (res == 4);

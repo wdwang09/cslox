@@ -38,7 +38,8 @@ internal enum OpCode : byte
     Return,
     Class,
     Inherit,
-    Method
+    Method,
+    Assert
 }
 
 public class Chunk
@@ -128,6 +129,8 @@ public class Chunk
                 return SimpleInstruction("OP_NEGATE", offset);
             case OpCode.Print:
                 return SimpleInstruction("OP_PRINT", offset);
+            case OpCode.Assert:
+                return SimpleInstruction("OP_ASSERT", offset);
             case OpCode.Jump:
                 return JumpInstruction("OP_JUMP", true, offset);
             case OpCode.JumpIfFalse:
