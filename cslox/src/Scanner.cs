@@ -89,45 +89,28 @@ public class Scanner
         _start = _current;
         if (IsAtEnd()) return MakeToken(TokenType.Eof);
         var c = Advance();
-        if (IsAlpha(c)) return IdentifierToken();
+        if (IsAlpha(c)) return IdentifierToken();  // keyword or variable name
         if (char.IsDigit(c)) return NumberToken();
-        switch (c)
+        return c switch
         {
-            case '(':
-                return MakeToken(TokenType.LeftParen);
-            case ')':
-                return MakeToken(TokenType.RightParen);
-            case '{':
-                return MakeToken(TokenType.LeftBrace);
-            case '}':
-                return MakeToken(TokenType.RightBrace);
-            case ';':
-                return MakeToken(TokenType.Semicolon);
-            case ',':
-                return MakeToken(TokenType.Comma);
-            case '.':
-                return MakeToken(TokenType.Dot);
-            case '-':
-                return MakeToken(TokenType.Minus);
-            case '+':
-                return MakeToken(TokenType.Plus);
-            case '/':
-                return MakeToken(TokenType.Slash);
-            case '*':
-                return MakeToken(TokenType.Star);
-            case '!':
-                return MakeToken(Match('=') ? TokenType.BangEqual : TokenType.Bang);
-            case '=':
-                return MakeToken(Match('=') ? TokenType.EqualEqual : TokenType.Equal);
-            case '<':
-                return MakeToken(Match('=') ? TokenType.LessEqual : TokenType.Less);
-            case '>':
-                return MakeToken(Match('=') ? TokenType.GreaterEqual : TokenType.Greater);
-            case '"':
-                return StringToken();
-        }
-
-        return ErrorToken("Unexpected character.");
+            '(' => MakeToken(TokenType.LeftParen),
+            ')' => MakeToken(TokenType.RightParen),
+            '{' => MakeToken(TokenType.LeftBrace),
+            '}' => MakeToken(TokenType.RightBrace),
+            ';' => MakeToken(TokenType.Semicolon),
+            ',' => MakeToken(TokenType.Comma),
+            '.' => MakeToken(TokenType.Dot),
+            '-' => MakeToken(TokenType.Minus),
+            '+' => MakeToken(TokenType.Plus),
+            '/' => MakeToken(TokenType.Slash),
+            '*' => MakeToken(TokenType.Star),
+            '!' => MakeToken(Match('=') ? TokenType.BangEqual : TokenType.Bang),
+            '=' => MakeToken(Match('=') ? TokenType.EqualEqual : TokenType.Equal),
+            '<' => MakeToken(Match('=') ? TokenType.LessEqual : TokenType.Less),
+            '>' => MakeToken(Match('=') ? TokenType.GreaterEqual : TokenType.Greater),
+            '"' => StringToken(),
+            _ => ErrorToken("Unexpected character.")
+        };
     }
 
     private void SkipWhitespace()
