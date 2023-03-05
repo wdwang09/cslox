@@ -24,7 +24,12 @@ public class CsLox
         }
 
         var source = File.ReadAllText(fileName);
-        var result = Interpret(source);
+        return RunCode(source);
+    }
+    
+    public int RunCode(string code)
+    {
+        var result = Interpret(code);
         return result switch
         {
             InterpretResult.Ok => 0,

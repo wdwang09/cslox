@@ -1,0 +1,51 @@
+﻿@page "/"
+
+<h1>CsLox with Blazor WebAssembly</h1>
+
+<div>
+    Read
+    <a target="_blank" href="https://craftinginterpreters.com/the-lox-language.html">
+        <em>Crafting Interpreters</em>
+    </a>
+    for Lox language details.
+</div>
+
+<br/>
+
+<div>Use Console in Developer Tools to show code result.</div>
+
+<br/>
+
+<div>
+    <textarea @bind="_textArea" rows="30" cols="80"></textarea>
+</div>
+
+<br/>
+
+<button @onclick="Run">Run</button>
+
+@code {
+
+    private readonly cslox.CsLox _csLox = new();
+
+    private string _textArea = @"// Warning: `n` should not be too large!
+fun fib(n) {
+    if (n <= 1) return n;
+    return fib(n - 2) + fib(n - 1);
+}
+var t1 = clock();
+var f_ans = fib(10);
+var t2 = clock();
+print f_ans;
+print t2-t1;
+";
+
+    private void Run()
+    {
+        if (_textArea.Length != 0)
+        {
+            _csLox.RunCode(_textArea);
+        }
+    }
+
+}

@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cslox", "cslox\cslox.csproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cslox_test", "cslox_test\cslox_test.csproj", "{F13A99D4-3D9E-4B25-B5FD-B1AF97FBC853}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cslox_blazor", "cslox_blazor\cslox_blazor.csproj", "{0FBB081D-C3FE-4F61-AF44-34B6E73798FA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{F13A99D4-3D9E-4B25-B5FD-B1AF97FBC853}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F13A99D4-3D9E-4B25-B5FD-B1AF97FBC853}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F13A99D4-3D9E-4B25-B5FD-B1AF97FBC853}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FBB081D-C3FE-4F61-AF44-34B6E73798FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FBB081D-C3FE-4F61-AF44-34B6E73798FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FBB081D-C3FE-4F61-AF44-34B6E73798FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FBB081D-C3FE-4F61-AF44-34B6E73798FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

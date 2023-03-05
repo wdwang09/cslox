@@ -11,11 +11,11 @@ cd cslox
 
 # REPL
 dotnet run
-dotnet run --configuration Release
+dotnet run -c release
 
 # FILE
 dotnet run code.lox
-dotnet run --configuration Release code.lox
+dotnet run -c release code.lox
 ```
 
 Test (for compilation error or runtime error):
@@ -24,3 +24,7 @@ Test (for compilation error or runtime error):
 # cd <solution directory>
 dotnet test
 ```
+
+For a WebAssembly-based compiler, use Visual Studio or Jetbrains Rider to build, run and publish project `cslox_blazor`.
+
+Currently `cslox_blazor` is a demo project, which means that you should use Console in Browser Developer Tools to show code result.
