@@ -4,6 +4,10 @@
         <TargetFramework>net6.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <!-- https://learn.microsoft.com/en-us/aspnet/core/blazor/host-and-deploy/webassembly?view=aspnetcore-6.0#disable-integrity-checking-for-non-pwa-apps-1 -->
+        <!-- Disable integrity checking (to avoid the situation that Git 
+             changes CRLF to LF which makes SHA256 unmatched). -->
+        <BlazorCacheBootResources>false</BlazorCacheBootResources>
     </PropertyGroup>
 
     <ItemGroup>
